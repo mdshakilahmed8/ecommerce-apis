@@ -1,0 +1,26 @@
+{
+  "name": "ecommerce-apis",
+  "version": "1.0.0",
+  "description": "E Commerce Website",
+  "license": "ISC",
+  "author": "Md Shakil Ahmed",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "config": "^4.2.0",
+    "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-mongo-sanitize": "^2.2.0",
+    "helmet": "^8.1.0",
+    "http-errors": "^2.0.1",
+    "mongoose": "^9.1.4",
+    "nodemon": "^3.1.11"
+  }
+}
