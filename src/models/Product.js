@@ -1,18 +1,12 @@
 const mongoose = require("mongoose");
 
-// ভেরিয়েন্ট স্কিমা (SKU)
+// Variant Schema
 const variantSchema = new mongoose.Schema({
-  sku: { type: String, required: true, sparse: true, unique: true }, // Unique Identifier e.g. "TSHIRT-RED-XL"
+  sku: { type: String, required: true, unique: true, sparse: true }, 
   price: { type: Number, required: true },
-  discountPrice: { type: Number },
   stock: { type: Number, required: true, default: 0 },
-  image: { type: String }, // Specific image for variant
-  
-  // Dynamic Attributes: [{ key: "Color", value: "Red" }, { key: "Size", value: "XL" }]
-  attributes: [{
-    key: String,
-    value: String
-  }]
+  image: String,
+  attributes: { type: Map, of: String } // { Color: "Red", Size: "XL" } - Better for querying
 });
 
 const productSchema = new mongoose.Schema({
@@ -20,39 +14,31 @@ const productSchema = new mongoose.Schema({
   slug: { type: String, required: true, unique: true },
   description: { type: String, required: true },
   
-  shop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop", required: true },
+  // References
   category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
-  brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand" },
+  brand: { type: mongoose.Schema.Types.ObjectId, ref: "Brand" }, // Optional
 
-  // Base Price (লিস্টিং পেজে দেখানোর জন্য)
-  price: { type: Number, required: true },
-  discountPrice: { type: Number },
-  
-  // গ্যালারি ছবি
+  // Pricing
+  price: { type: Number, required: true }, // Base Price
+  discountPrice: { type: Number }, // Optional Sale Price
+
   images: [{ type: String }],
   
-  // প্রোডাক্ট টাইপ
+  // Inventory Logic
   hasVariants: { type: Boolean, default: false },
-  
-  // যদি ভেরিয়েন্ট থাকে, তাহলে এই অ্যারেতে ডাটা থাকবে
   variants: [variantSchema],
-  
-  // সাধারণ স্টক (যদি ভেরিয়েন্ট না থাকে)
-  stock: { type: Number, default: 0 },
+  stock: { type: Number, default: 0 }, // For non-variant products
 
-  tags: [{ type: String }], // Search optimization
-  
+  tags: [String],
   isPublished: { type: Boolean, default: true },
-  isFeatured: { type: Boolean, default: false },
   
+  // Analytics
+  sold: { type: Number, default: 0 },
   ratingsAverage: { type: Number, default: 0 },
-  ratingsQuantity: { type: Number, default: 0 },
-  
-  sold: { type: Number, default: 0 } // মোট বিক্রি
+  ratingsQuantity: { type: Number, default: 0 }
+
 }, { timestamps: true });
 
-// ফাস্ট সার্চের জন্য ইনডেক্সিং
 productSchema.index({ title: "text", tags: "text" });
-productSchema.index({ shop: 1, category: 1 });
 
 module.exports = mongoose.model("Product", productSchema);
