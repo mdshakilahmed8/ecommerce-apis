@@ -5,7 +5,6 @@ const connectToDatabase = async () => {
     // Mongoose v7/v8 এ strictQuery ওয়ার্নিং এড়াতে এটা দেওয়া ভালো (অপশনাল)
     mongoose.set("strictQuery", false);
 
-    console.log(process.env.MONGO_DB_URL);
     const conn = await mongoose.connect(process.env.MONGO_DB_URL);
 
     console.log(`Database Connected`);
