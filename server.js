@@ -14,6 +14,10 @@ const swaggerDocument = require("./swagger-output.json");
 
 const apiRoutes = require("./src/routes")
 
+// Seeder Imports
+const seedSuperAdmin = require("./src/seeders/adminSeeder");
+const seedRoles = require("./src/seeders/roleSeeder");
+//Seeder Imports End
 
 const bootstrapApp = async () => {
   try {
@@ -57,6 +61,9 @@ const bootstrapApp = async () => {
 
     // Database connect hobar por server start hobe
     await connectToDatabase();
+
+    // await seedSuperAdmin();
+    // await seedRoles();
 
     app.listen(port, () => {
       console.log(`Server running on port: ${port}`);
