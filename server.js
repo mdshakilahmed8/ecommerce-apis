@@ -5,6 +5,7 @@ const mongoSanitize = require("express-mongo-sanitize");
 const createError = require("http-errors");
 const morgan = require("morgan");
 const cors = require("cors");
+const cookieParser = require("cookie-parser"); 
 
 const { port } = require("./src/secret");
 const { connectToDatabase } = require("./src/services/database");
@@ -30,6 +31,7 @@ const bootstrapApp = async () => {
 
     // 3. Body Parsers
     app.use(express.json());
+    app.use(cookieParser());
     app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
     // 4. Sanitize Data to prevent NoSQL Injection
@@ -62,6 +64,7 @@ const bootstrapApp = async () => {
     // Database connect hobar por server start hobe
     await connectToDatabase();
 
+    // Database Seeding
     // await seedSuperAdmin();
     // await seedRoles();
 

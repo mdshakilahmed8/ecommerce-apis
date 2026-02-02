@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const { passwordSalt } = require("../secret");
 
 // Address Schema
 const addressSchema = new mongoose.Schema({
@@ -64,7 +65,7 @@ userSchema.index({ "phone.countryCode": 1, "phone.number": 1 }, { unique: true }
 // Password Hash Middleware
 userSchema.pre("save", async function () { 
   if (!this.isModified("password")) return;
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, Number(passwordSalt));
 });
 
 // Compare Password Method

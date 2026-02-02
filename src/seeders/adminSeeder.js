@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const Role = require("../models/Role");
 const bcrypt = require("bcryptjs");
+const { passwordSalt } = require("../secret");
 
 const seedSuperAdmin = async () => {
   try {
@@ -38,14 +39,12 @@ const seedSuperAdmin = async () => {
     });
 
     if (!existingAdmin) {
-      const hashedPassword = await bcrypt.hash("SuperSecretPass123!", 12);
 
       await User.create({
         name: "System Owner",
         email: adminData.email,
         phone: adminData.phone,
-        password: hashedPassword,
-        
+        password: "@Admin123",        
         role: superAdminRole._id,
         
         // --- Single Vendor & Auth Fixes ---

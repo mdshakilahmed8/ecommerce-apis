@@ -284,7 +284,8 @@ exports.resendOtp = async (req, res, next) => {
 // --- 6. REFRESH TOKEN (NEW) ---
 exports.refreshToken = async (req, res, next) => {
     try {
-        const { refreshToken } = req.cookies; // কুকি থেকে টোকেন নিব
+        const { refreshToken } = req.cookies;
+
 
         if (!refreshToken) throw createError(401, "Refresh token missing.");
 

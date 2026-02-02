@@ -29,10 +29,14 @@ const categorySchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto Slug & Hierarchy Middleware
-categorySchema.pre("save", async function (next) {
+categorySchema.pre("save", async function () {
+  
+  // ১. স্লাগ জেনারেট
   if (this.isModified("name") && !this.slug) {
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
+
+  // ২. প্যারেন্ট-চাইল্ড রিলেশন (Hierarchy)
   if (this.parentId) {
     const parent = await mongoose.model("Category").findById(this.parentId);
     if (parent) {
@@ -43,7 +47,7 @@ categorySchema.pre("save", async function (next) {
     this.ancestors = [];
     this.level = 0;
   }
-  next();
+  
 });
 
 module.exports = mongoose.model("Category", categorySchema);
