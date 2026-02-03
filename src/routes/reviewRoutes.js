@@ -5,7 +5,8 @@ const {
     getProductReviews, 
     getAllReviewsAdmin,
     updateReviewStatus,
-    deleteReview 
+    deleteReview,
+    adminReplyToReview
 } = require("../controller/reviewController");
 
 const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
@@ -23,5 +24,7 @@ router.delete("/:id", deleteReview);
 // --- ADMIN ROUTES ---
 router.get("/admin/all", isAdmin, getAllReviewsAdmin); // সব রিভিউ দেখবে
 router.put("/admin/status/:id", isAdmin, updateReviewStatus); // স্ট্যাটাস চেঞ্জ করবে
+
+router.put("/admin/reply/:id", isAdmin, adminReplyToReview);
 
 module.exports = router;

@@ -148,3 +148,37 @@ exports.deleteReview = async (req, res, next) => {
     next(error);
   }
 };
+
+
+//Admin Reply Function
+exports.adminReplyToReview = async (req, res, next) => {
+  try {
+    const { reply } = req.body;
+    const reviewId = req.params.id;
+
+    if (!reply) {
+        throw createError(400, "Reply message is required");
+    }
+
+    const review = await Review.findById(reviewId);
+    if (!review) throw createError(404, "Review not found");
+
+    // রিপ্লাই আপডেট করা
+    review.adminReply = reply;
+    review.adminRepliedAt = Date.now();
+    
+    // রিভিউ যদি আগে পেন্ডিং থাকে, রিপ্লাই দেওয়ার সাথে সাথে সেটা অ্যাপ্রুভ করে দেওয়া ভালো (অপশনাল)
+    // review.isApproved = true; 
+
+    await review.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Reply added successfully",
+      data: review
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};

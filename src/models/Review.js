@@ -2,21 +2,34 @@ const mongoose = require("mongoose");
 const Product = require("./Product");
 
 const reviewSchema = new mongoose.Schema({
+  // 1. Review Text
   review: { 
     type: String, 
     required: [true, "Review can not be empty!"] 
   },
+  
+  // 2. Rating (1 to 5)
   rating: { 
     type: Number, 
     min: 1, 
     max: 5, 
-    required: true 
+    required: [true, "Rating is required"] 
   },
   
-  // ইমেজ এবং অ্যাপ্রুভাল সিস্টেম
+  // 3. Review Images
   images: [{ type: String }], 
-  isApproved: { type: Boolean, default: false }, // ডিফল্ট: পেন্ডিং
+  
+  // 4. Approval Status (Default: Pending)
+  isApproved: { 
+    type: Boolean, 
+    default: false 
+  },
 
+  // 5. Admin Reply Section
+  adminReply: { type: String }, 
+  adminRepliedAt: { type: Date },
+
+  // 6. Timestamps & Relations
   createdAt: { type: Date, default: Date.now },
   
   product: {
@@ -31,29 +44,33 @@ const reviewSchema = new mongoose.Schema({
     required: [true, "Review must belong to a user"]
   }
 }, {
+    // Virtual fields শো করার জন্য
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-// 1. Prevent Duplicate Review (Unique Compound Index)
+// --- INDEXES ---
+// Prevent Duplicate Review: একজন ইউজার একটা প্রোডাক্টে একবারই রিভিউ দিতে পারবে
 reviewSchema.index({ product: 1, user: 1 }, { unique: true });
 
-// 2. Populate User Info
-reviewSchema.pre(/^find/, function(next) {
+// --- MIDDLEWARE (HOOKS) ---
+
+// 1. Populate User Info Automatically
+// Note: এখানে 'next' ব্যবহার করা হয়নি সেফটির জন্য
+reviewSchema.pre(/^find/, function() {
   this.populate({
     path: "user",
-    select: "name avatar"
+    select: "name avatar" // ইউজারের পাসওয়ার্ড বা সেনসিটিভ ডাটা যাতে না আসে
   });
-  next();
 });
 
-// 3. Static Method: Calculate Avg Rating (Only Approved Reviews)
+// 2. Static Method: Calculate Avg Rating & Quantity
 reviewSchema.statics.calcAverageRatings = async function(productId) {
   const stats = await this.aggregate([
     { 
       $match: { 
         product: productId, 
-        isApproved: true // ⚠️ শুধুমাত্র অ্যাপ্রুভড রিভিউ কাউন্ট হবে
+        isApproved: true // ⚠️ শুধুমাত্র অ্যাপ্রুভ করা রিভিউ কাউন্ট হবে
       } 
     },
     {
@@ -71,6 +88,7 @@ reviewSchema.statics.calcAverageRatings = async function(productId) {
       ratingsAverage: stats[0].avgRating
     });
   } else {
+    // যদি সব রিভিউ ডিলিট হয়ে যায় বা হাইড করা হয়
     await Product.findByIdAndUpdate(productId, {
       ratingsQuantity: 0,
       ratingsAverage: 0
@@ -78,12 +96,14 @@ reviewSchema.statics.calcAverageRatings = async function(productId) {
   }
 };
 
-// 4. Hooks to Trigger Calculation
+// 3. Hook: Call calculation AFTER saving a new review
 reviewSchema.post("save", function() {
-  // রিভিউ সেভ বা আপডেট হলে ক্যালকুলেশন হবে
+  // this.constructor points to the Model
   this.constructor.calcAverageRatings(this.product);
 });
 
+// 4. Hook: Call calculation AFTER updating or deleting a review
+// (findByIdAndUpdate & findByIdAndDelete triggers this)
 reviewSchema.post(/^findOneAnd/, async function(doc) {
   if (doc) {
     await doc.constructor.calcAverageRatings(doc.product);
