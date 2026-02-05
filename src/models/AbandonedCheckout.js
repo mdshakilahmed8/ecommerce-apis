@@ -1,70 +1,53 @@
 const mongoose = require("mongoose");
 
 const abandonedCheckoutSchema = new mongoose.Schema({
-  // 1. Tracking ID (Guest user der track korar jonno)
-  // Frontend local storage e ekta 'guestId' generate kore rakhbe
+  // ১. আইডেন্টিফিকেশন
   guestId: { type: String, index: true }, 
-  
-  // Jodi logged in user hoy
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
 
-  // 2. Captured Data (Je data gulo user type koreche)
-  // Ekhane kono field 'required' hobe na, karon user halfway chere dite pare
-  customerDetails: {
-    name: { type: String, trim: true },
-    email: { type: String, trim: true },
-    
-    // Previous standard onujayi phone object
-    phone: { 
-      countryCode: { type: String, default: "+880" },
-      number: { type: String, trim: true } 
-    },
-
-    address: String,
-    city: String,
-    area: String
-  },
-
-  // 3. Cart Items (Se ki kinte cheyechilo)
+  // ২. আইটেম (অর্ডার মডেলের মতো সেম স্ট্রাকচার)
   items: [{
     product: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
     variantId: mongoose.Schema.Types.ObjectId,
-    name: String,
-    sku: String,
-    image: String,
-    price: Number,
     quantity: Number,
+    // ভিউ করার জন্য কিছু ডাটা রাখা, তবে অর্ডার প্লেস করার সময় রি-ক্যালকুলেট হবে
+    price: Number, 
     total: Number
   }],
+  ipAddress: { type: String },
 
-  // Financials
-  subTotal: Number,
-  grandTotal: Number,
-
-  // 4. Recovery Status
-  // Order complete hole amra eta 'true' kore dibo, ba entry ta delete kore dibo
-  isRecovered: { type: Boolean, default: false }, 
-  
-  // User kothay drop koreche? (Analytics er jonno)
-  dropOffStage: { 
-    type: String, 
-    enum: ["cart_view", "contact_info", "shipping_info", "payment_method"],
-    default: "contact_info"
+  // ৩. শিপিং এড্রেস (অর্ডার মডেলের মতো সেম স্ট্রাকচার)
+  shippingAddress: {
+    fullName: { type: String, trim: true },
+    fullAddress: String, 
+    phone: { 
+        countryCode: { type: String, default: "+880" },
+        number: { type: String, trim: true }
+    },
+    city: String,
+    area: String,
+    zip: String,
+    email: String
   },
 
-  // 5. Recovery Attempts (Call/SMS history)
-  recoveryLogs: [{
-    method: { type: String, enum: ["sms", "email", "call"] },
-    note: String, // "Customer bollo pore nibe"
-    calledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Admin Staff
-    date: { type: Date, default: Date.now }
-  }]
+  // ৪. ফিন্যান্সিয়াল
+  subTotal: Number,
+  shippingFee: Number,
+  discount: Number,
+  grandTotal: Number,
+
+  // ৫. স্ট্যাটাস
+  dropOffStage: { 
+    type: String, 
+    enum: ["cart_view", "checkout_init", "shipping_info", "payment_method"],
+    default: "checkout_init"
+  },
+  
+  isRecovered: { type: Boolean, default: false }, 
+  isRecoveredByOrder: { type: mongoose.Schema.Types.ObjectId, ref: "Order" }
 
 }, { timestamps: true });
 
-// --- AUTO DELETE (Optional) ---
-// 30 din por ai data auto delete hoye jabe, karon 1 mash purono lead sales e convert hoy na.
-// expireAfterSeconds: 30 * 24 * 60 * 60 = 2592000 seconds
-abandonedCheckoutSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
+abandonedCheckoutSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 }); // ৩০ দিন পর ডিলিট
 
 module.exports = mongoose.model("AbandonedCheckout", abandonedCheckoutSchema);

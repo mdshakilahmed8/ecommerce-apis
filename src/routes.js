@@ -6,6 +6,8 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const brandRoutes = require("./routes/brandRoutes");
 const productRoutes = require("./routes/productRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const abandonedRoutes = require("./routes/abandonedRoutes");
+const orderRoutes = require("./routes/orderRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -13,6 +15,8 @@ router.use("/categories", categoryRoutes);
 router.use("/brands", brandRoutes);
 router.use("/products", productRoutes);
 router.use("/reviews", reviewRoutes);
+router.use("/abandoned", abandonedRoutes);
+router.use("/orders", orderRoutes);
 
 module.exports = router;
 

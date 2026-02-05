@@ -24,9 +24,9 @@ exports.verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, secretKey);
     
     // ৩. ডাটাবেস থেকে ফ্রেশ ইউজার ডাটা আনা (সিকিউরিটির জন্য)
-    // আমরা রোল পপুলেট করছি যাতে পরের ধাপে রোল চেক করা যায়
+    // আমরা রোল পপুলেট করছি যাতে পরের ধাপে রোল চেক করা যায়
     const user = await User.findById(decoded._id).populate("role");
-
+    
     if (!user) {
       throw createError(401, "User not found or token invalid.");
     }
@@ -43,6 +43,7 @@ exports.verifyToken = async (req, res, next) => {
 
   } catch (error) {
     // JWT এর নিজস্ব এরর হ্যান্ডলিং
+    console.error("Auth Middleware Error:", error);
     if (error.name === "TokenExpiredError") {
       return next(createError(401, "Token has expired. Please login again."));
     }
