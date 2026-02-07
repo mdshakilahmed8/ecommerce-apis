@@ -34,7 +34,7 @@ const orderSchema = new mongoose.Schema({
   },
 
   // 4. Payment Info
-  paymentMethod: { type: String, enum: ["COD", "Online"], default: "COD" },
+  paymentMethod: { type: String, enum: ["sslcommerz", "bkash", "nagad", "cod"], default: "cod" },
   paymentStatus: { type: String, enum: ["pending", "paid", "failed"], default: "pending" },
   
   // 5. Financials (Calculated on Backend)
