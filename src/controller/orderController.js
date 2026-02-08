@@ -94,7 +94,7 @@ const placeOrderInternal = async (orderData, user, ip) => {
             ...shippingAddress,
             // 🔥 ADDRESS FIX: Ensure minimal required fields
             phone: { 
-                countryCode: shippingAddress.phone.countryCode || "+880", 
+                countryCode: shippingAddress.phone.countryCode || "880", 
                 number: shippingAddress.phone.number 
             }
         },
@@ -163,7 +163,7 @@ exports.initiateOrder = async (req, res, next) => {
         }
 
         const userPhone = shippingAddress.phone.number;
-        const countryCode = shippingAddress.phone.countryCode || "+880";
+        const countryCode = shippingAddress.phone.countryCode || "880";
         let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
         
         // 3. Check User
@@ -257,7 +257,7 @@ exports.verifyOrderOTP = async (req, res, next) => {
     try {
         const { otp, shippingAddress, ...orderData } = req.body; 
         const userPhone = shippingAddress.phone.number;
-        const countryCode = shippingAddress.phone.countryCode || "+880";
+        const countryCode = shippingAddress.phone.countryCode || "880";
 
         // 1. Verify OTP
         const otpRecord = await Otp.findOne({ 

@@ -27,7 +27,10 @@ const bootstrapApp = async () => {
 
     // 2. Security Middleware
     app.use(helmet({ contentSecurityPolicy: false })); // Swagger er jonno CSP false rakhlam
-    app.use(cors()); // Frontend (React/Vue) theke access er jonno
+    app.use(cors({
+      origin: ["http://localhost:3001", "https://gonifood.com"],
+      credentials: true,
+    })); // Frontend (React/Vue) theke access er jonno
 
     // 3. Body Parsers
     app.use(express.json());

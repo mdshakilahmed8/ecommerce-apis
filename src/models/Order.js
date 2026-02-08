@@ -24,7 +24,7 @@ const orderSchema = new mongoose.Schema({
     fullName: String,
     fullAddress: String, // Main address field
     phone: { 
-        countryCode: { type: String, default: "+880" },
+        countryCode: { type: String, default: "880" },
         number: { type: String, required: true }
     },
     city: String,

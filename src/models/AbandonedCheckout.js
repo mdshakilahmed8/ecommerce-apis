@@ -21,7 +21,7 @@ const abandonedCheckoutSchema = new mongoose.Schema({
     fullName: { type: String, trim: true },
     fullAddress: String, 
     phone: { 
-        countryCode: { type: String, default: "+880" },
+        countryCode: { type: String, default: "880" },
         number: { type: String, trim: true }
     },
     city: String,

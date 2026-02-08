@@ -15,8 +15,8 @@ const registerSchema = z.object({
 
   countryCode: z
     .string({ required_error: "Country code is required" })
-    .regex(/^\+\d{1,4}$/, "Invalid country code format (e.g., +880)")
-    .default("+880"),
+    .regex(/^\d{1,4}$/, "Invalid country code format (e.g., 880)")
+    .default("880"),
 
   phoneNumber: z
     .string({ required_error: "Mobile Number is required" })
@@ -44,8 +44,8 @@ const registerSchema = z.object({
 const verifyOtpSchema = z.object({
   countryCode: z
     .string()
-    .regex(/^\+\d{1,4}$/, "Invalid country code")
-    .default("+880"),
+   .regex(/^\d{1,4}$/, "Invalid country code format (e.g., 880)")
+    .default("880"),
   
   phoneNumber: z
     .string({ required_error: "Mobile Number is required" })
@@ -67,7 +67,7 @@ const loginSchema = z.object({
     z.string().email("Invalid email address").nullable().optional()
   ),
   
-  countryCode: z.string().default("+880"),
+  countryCode: z.string().default("880"),
   
   // ২. ফোন নম্বর ভ্যালিডেশন (লগইনেও ফরম্যাট চেক রাখা ভালো)
   phoneNumber: z

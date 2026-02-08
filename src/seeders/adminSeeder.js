@@ -25,7 +25,7 @@ const seedSuperAdmin = async () => {
     const adminData = {
         email: "admin@barakahit.com",
         phone: {
-            countryCode: "+880",
+            countryCode: "880",
             number: "1700000000"
         }
     };

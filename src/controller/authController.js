@@ -7,27 +7,24 @@ const { secretKey, accessTokenExpiration, refreshTokenExpiration } = require("..
 
 // --- 1. REGISTER USER ---
 exports.registerUser = async (req, res, next) => {
+  // ... (রেজিস্ট্রেশন কোড ঠিক আছে, কোনো চেঞ্জ লাগবে না)
   try {
-    const { fullName, email, countryCode = "+880", phoneNumber, password } = req.body;
+    const { fullName, email, countryCode = "880", phoneNumber, password } = req.body;
 
-    // ১. ডাটাবেসে চেক করি এই নাম্বারে ইউজার আছে কিনা
     let user = await User.findOne({ 
       "phone.countryCode": countryCode, 
       "phone.number": phoneNumber 
     });
 
-    // কেইস A: ইউজার আছে এবং ভেরিফাইড
     if (user && user.isPhoneVerified) {
       throw createError(409, "This phone number is already registered. Please login.");
     }
 
-    // ২. 'Customer' রোল খুঁজে বের করা
     const customerRole = await Role.findOne({ slug: "customer" });
     if (!customerRole) {
       throw createError(500, "System Error: Default 'customer' role not found.");
     }
 
-    // কেইস B & C: ইউজার আপডেট বা নতুন তৈরি
     if (user) {
       user.name = fullName;
       user.email = email === "" ? undefined : email;
@@ -37,10 +34,7 @@ exports.registerUser = async (req, res, next) => {
       user = new User({
         name: fullName,
         email: email === "" ? undefined : email,
-        phone: { 
-            countryCode: countryCode, 
-            number: phoneNumber 
-        },
+        phone: { countryCode, number: phoneNumber },
         password,
         role: customerRole._id
       });
@@ -48,20 +42,11 @@ exports.registerUser = async (req, res, next) => {
 
     await user.save();
 
-    // ৩. OTP জেনারেট এবং সেভ
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    await Otp.deleteMany({ 
-      "phone.countryCode": countryCode, 
-      "phone.number": phoneNumber 
-    });
-    
-    await Otp.create({ 
-      phone: { countryCode, number: phoneNumber }, 
-      otp: otpCode 
-    });
+    await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
+    await Otp.create({ phone: { countryCode, number: phoneNumber }, otp: otpCode });
 
-    // TODO: SMS API Call here
     console.log(`>>> OTP sent to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
 
     res.status(200).json({
@@ -84,7 +69,7 @@ exports.registerUser = async (req, res, next) => {
 // --- 2. VERIFY OTP ---
 exports.verifyOtp = async (req, res, next) => {
   try {
-    const { countryCode = "+880", phoneNumber, otp } = req.body;
+    const { countryCode = "880", phoneNumber, otp } = req.body;
 
     const otpRecord = await Otp.findOne({ 
       "phone.countryCode": countryCode, 
@@ -94,13 +79,13 @@ exports.verifyOtp = async (req, res, next) => {
     if (!otpRecord) throw createError(400, "Invalid request or OTP expired.");
     if (otpRecord.otp !== otp) throw createError(400, "Invalid OTP.");
     
-    // ম্যানুয়াল এক্সপায়ার চেক
     const otpTime = new Date(otpRecord.createdAt).getTime();
     if ((Date.now() - otpTime) > (5 * 60 * 1000)) {
         await Otp.deleteOne({ _id: otpRecord._id });
         throw createError(400, "OTP expired.");
     }
 
+    // 🔥 POPULATE ROLE HERE
     const user = await User.findOne({ 
       "phone.countryCode": countryCode, 
       "phone.number": phoneNumber 
@@ -112,13 +97,9 @@ exports.verifyOtp = async (req, res, next) => {
     user.status = "active";
     await user.save();
     
-    await Otp.deleteMany({ 
-      "phone.countryCode": countryCode, 
-      "phone.number": phoneNumber 
-    });
+    await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
 
-    // টোকেন জেনারেট Helper Function ব্যবহার করা ভালো, তবে এখানে সরাসরি দিচ্ছি
-    const payload = { _id: user._id, role: user.role }; // Role Object pass korsi for middleware
+    const payload = { _id: user._id, role: user.role }; 
     
     const accessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration });
     const refreshToken = jwt.sign(payload, secretKey, { expiresIn: refreshTokenExpiration });
@@ -128,6 +109,7 @@ exports.verifyOtp = async (req, res, next) => {
       httpOnly: true, 
       secure: process.env.NODE_ENV === "production", 
       sameSite: "strict",
+      path: "/"
     });
 
     res.status(200).json({
@@ -137,7 +119,9 @@ exports.verifyOtp = async (req, res, next) => {
         user: {
           _id: user._id,
           name: user.name,
-          role: user.role.slug,
+          // ❌ আগে ছিল: role: user.role.slug 
+          // ✅ এখন হবে: পুরো অবজেক্ট পাঠানো
+          role: user.role, 
           avatar: user.avatar
         },
         token: { accessToken, refreshToken }
@@ -152,39 +136,24 @@ exports.verifyOtp = async (req, res, next) => {
 // --- 3. LOGIN USER (SMART LOGIN) ---
 exports.loginUser = async (req, res, next) => {
   try {
-    const { email, countryCode = "+880", phoneNumber, password } = req.body;
+    const { email, countryCode = "880", phoneNumber, password } = req.body;
 
     let user = null;
 
-    // --- CASE 1: ADMIN / EMAIL LOGIN ---
     if (email) {
       user = await User.findOne({ email }).select("+password").populate("role");
-      
       if (!user) throw createError(404, "Admin/User not found with this email.");
-
-      // [SUGGESTION] এডমিনের ইমেইল ভেরিফাইড কিনা চেক করা ভালো
-      if (!user.isEmailVerified) {
-        throw createError(403, "Email is not verified. Contact System Owner.");
-      }
-    } 
-    
-    // --- CASE 2: CUSTOMER / PHONE LOGIN ---
-    else if (phoneNumber) {
+      if (!user.isEmailVerified) throw createError(403, "Email is not verified.");
+    } else if (phoneNumber) {
       user = await User.findOne({ 
         "phone.countryCode": countryCode, 
         "phone.number": phoneNumber 
       }).select("+password").populate("role");
 
-      if (!user) throw createError(404, "User not found with this phone number.");
-
-      // কাস্টমারের ক্ষেত্রে ফোন ভেরিফাইড হতে হবে
-      if (!user.isPhoneVerified) {
-        throw createError(403, "Phone number is not verified. Please verify OTP first.");
-      }
+      if (!user) throw createError(404, "User not found.");
+      if (!user.isPhoneVerified) throw createError(403, "Phone number is not verified.");
     }
 
-    // --- COMMON CHECKS ---
-    
     const isMatch = await user.comparePassword(password);
     if (!isMatch) throw createError(401, "Invalid credentials.");
 
@@ -203,8 +172,9 @@ exports.loginUser = async (req, res, next) => {
     res.cookie("refreshToken", refreshToken, {
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: false, 
       sameSite: "strict",
+      path:"/"
     });
 
     res.status(200).json({
@@ -216,7 +186,9 @@ exports.loginUser = async (req, res, next) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          role: user.role.slug,
+          // ❌ আগে ছিল: role: user.role.slug (এটিই সমস্যা ছিল)
+          // ✅ এখন হবে: পুরো role অবজেক্ট পাঠানো
+          role: user.role, 
           avatar: user.avatar
         },
         token: { accessToken, refreshToken }
@@ -228,28 +200,29 @@ exports.loginUser = async (req, res, next) => {
   }
 };
 
-// --- 4. LOGOUT USER (NEW) ---
+// ... Logout, ResendOTP, RefreshToken same as before (no changes needed) ...
 exports.logoutUser = async (req, res, next) => {
-  try {
-    res.clearCookie("refreshToken", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Logged out successfully",
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// --- 5. RESEND OTP (NEW) ---
-exports.resendOtp = async (req, res, next) => {
     try {
-        const { countryCode = "+880", phoneNumber } = req.body;
+      res.clearCookie("refreshToken", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/" // Logout এও path "/" দেওয়া ভালো
+      });
+  
+      res.status(200).json({
+        success: true,
+        message: "Logged out successfully",
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  exports.resendOtp = async (req, res, next) => {
+    // ... আপনার আগের কোড ...
+    try {
+        const { countryCode = "880", phoneNumber } = req.body;
 
         const user = await User.findOne({ 
             "phone.countryCode": countryCode, 
@@ -259,7 +232,6 @@ exports.resendOtp = async (req, res, next) => {
         if (!user) throw createError(404, "User not found.");
         if (user.isPhoneVerified) throw createError(400, "User is already verified. Please Login.");
 
-        // OTP জেনারেট
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         
         await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
@@ -268,7 +240,6 @@ exports.resendOtp = async (req, res, next) => {
             otp: otpCode 
         });
 
-        // TODO: SMS API Logic
         console.log(`>>> Resend OTP to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
 
         res.status(200).json({
@@ -281,22 +252,15 @@ exports.resendOtp = async (req, res, next) => {
     }
 };
 
-// --- 6. REFRESH TOKEN (NEW) ---
 exports.refreshToken = async (req, res, next) => {
     try {
         const { refreshToken } = req.cookies;
-
-
         if (!refreshToken) throw createError(401, "Refresh token missing.");
 
-        // ভেরিফাই
         const decoded = jwt.verify(refreshToken, secretKey);
-        
-        // ইউজার চেক (সিকিউরিটির জন্য)
         const user = await User.findById(decoded._id).populate("role");
         if (!user) throw createError(404, "User not found.");
 
-        // নতুন এক্সেস টোকেন
         const payload = { _id: user._id, role: user.role };
         const newAccessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration });
 

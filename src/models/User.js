@@ -8,7 +8,7 @@ const addressSchema = new mongoose.Schema({
   fullName: { type: String, required: true },
   
   phone: { 
-    countryCode: { type: String, default: "+880" },
+    countryCode: { type: String, default: "880" },
     number: { type: String, required: true, trim: true }
   },
   
@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema({
   
   // Customer Login (Phone is Primary)
   phone: { 
-    countryCode: { type: String, default: "+880", required: true }, 
+    countryCode: { type: String, default: "880", required: true }, 
     number: { type: String, required: true, trim: true } 
   },
 
