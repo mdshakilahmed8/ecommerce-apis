@@ -8,7 +8,11 @@ const roleSchema = new mongoose.Schema({
   // Example: ['product.create', 'order.view', 'user.ban']
   permissions: [{ type: String }], 
   
-  description: String
+  description: String,
+  isEditable: { 
+    type: Boolean, 
+    default: true
+  }
 
 }, { timestamps: true });
 

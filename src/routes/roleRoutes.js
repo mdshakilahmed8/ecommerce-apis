@@ -24,7 +24,7 @@ const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
 // ১. verifyToken: ইউজার লগইন করা আছে কি না এবং টোকেন ভ্যালিড কি না।
 // ২. isAdmin: ইউজারের রোল 'admin' বা 'super_admin' কি না।
 // সাধারণ কাস্টমার বা ভেন্ডর এখানে ঢুকতে পারবে না।
-// router.use(verifyToken, isAdmin); 
+router.use(verifyToken, isAdmin); 
 
 // Routes
 router.route("/")

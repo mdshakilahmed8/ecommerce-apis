@@ -36,10 +36,11 @@ exports.createRole = async (req, res, next) => {
   }
 };
 
-// 2. Get All Roles
+// 2. Get All Roles (Admin & Staff Only)
 exports.getAllRoles = async (req, res, next) => {
   try {
-    const roles = await Role.find().select("-__v");
+    // 🔥 UPDATE: 'customer' স্লাগ বাদে বাকি সব রোল নিয়ে আসবে
+    const roles = await Role.find({ slug: { $ne: "customer" } }).select("-__v");
     
     res.status(200).json({
       success: true,
