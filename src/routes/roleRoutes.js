@@ -11,29 +11,48 @@ const {
 } = require("../controller/roleController");
 
 // Validation Middleware
-// নোট: আপনার validateRequest ফাইলটি যেভাবে এক্সপোর্ট করা, সেভাবে ইম্পোর্ট করবেন।
-// যদি module.exports = validateRequest হয়, তাহলে ব্র্যাকেট {} ছাড়া ইম্পোর্ট করবেন।
-const {validateRequest} = require("../middlewares/validateRequest"); 
+const { validateRequest } = require("../middlewares/validateRequest"); 
 const { createRoleSchema, updateRoleSchema } = require("../validators/roleValidator");
 
-// Auth Middleware (Uncommented & Active)
-const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
+// Auth Middleware (Updated)
+// 🔥 isAdmin এর বদলে checkPermission ইম্পোর্ট করছি
+const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
 
-// --- SECURITY BLOCK (The Gatekeeper) ---
-// এই ফাইলের নিচের যেকোনো রাউটে হিট করার আগে সিস্টেম চেক করবে:
-// ১. verifyToken: ইউজার লগইন করা আছে কি না এবং টোকেন ভ্যালিড কি না।
-// ২. isAdmin: ইউজারের রোল 'admin' বা 'super_admin' কি না।
-// সাধারণ কাস্টমার বা ভেন্ডর এখানে ঢুকতে পারবে না।
-router.use(verifyToken, isAdmin); 
+// --- SECURITY BLOCK ---
+// ১. লগইন চেক (সবার জন্য বাধ্যতামূলক)
+router.use(verifyToken); 
 
-// Routes
+// --- ROUTES ---
+
 router.route("/")
-  .post(validateRequest(createRoleSchema), createRole) // Create (Only Admin)
-  .get(getAllRoles); // Read All (Only Admin)
+  // ১. রোল তৈরি (Create) - যার 'role.manage' পারমিশন আছে
+  .post(
+      checkPermission("role.create"), 
+      validateRequest(createRoleSchema), 
+      createRole
+  ) 
+  // ২. সব রোল দেখা (Read All) - যার 'role.view' পারমিশন আছে
+  .get(
+      checkPermission("role.view"), 
+      getAllRoles
+  ); 
 
 router.route("/:id")
-  .get(getRoleById) // Read One (Only Admin)
-  .put(validateRequest(updateRoleSchema), updateRole) // Update (Only Admin)
-  .delete(deleteRole); // Delete (Only Admin)
+  // ৩. নির্দিষ্ট রোল দেখা (Read One) - যার 'role.view' পারমিশন আছে
+  .get(
+      checkPermission("role.view"), 
+      getRoleById
+  ) 
+  // ৪. রোল আপডেট (Update) - যার 'role.update' পারমিশন আছে
+  .put(
+      checkPermission("role.update"), 
+      validateRequest(updateRoleSchema), 
+      updateRole
+  ) 
+  // ৫. রোল ডিলিট (Delete) - যার 'role.delete' পারমিশন আছে
+  .delete(
+      checkPermission("role.delete"), 
+      deleteRole
+  ); 
 
 module.exports = router;

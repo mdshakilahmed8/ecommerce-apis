@@ -1,26 +1,55 @@
 const express = require("express");
 const router = express.Router();
 const { 
-    createProduct, 
-    getAllProducts, 
-    getProductBySlug, 
-    updateProduct, 
-    deleteProduct 
+  createProduct, 
+  getAllProducts, 
+  getProductBySlug, 
+  updateProduct, 
+  deleteProduct 
 } = require("../controller/productController");
 
 // Middlewares
 const upload = require("../middlewares/upload");
-const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
+// 🔥 isAdmin এর বদলে checkPermission ইম্পোর্ট
+const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
 
-// --- PUBLIC ROUTES (কাস্টমারদের জন্য) ---
-router.get("/", getAllProducts); // সার্চ, ফিল্টার সব এটাতে
-router.get("/:slug", getProductBySlug); // সিঙ্গেল প্রোডাক্ট পেইজ
+// ==================================================================
+// PUBLIC ROUTES (Storefront)
+// ==================================================================
+// প্রোডাক্ট দেখা সবার জন্য উন্মুক্ত
+router.get("/", getAllProducts); 
+router.get("/:slug", getProductBySlug); 
 
-// --- ADMIN ROUTES ---
-router.use(verifyToken, isAdmin);
 
-router.post("/create", upload.array("images", 5), createProduct); // ম্যাক্স ৫টা ছবি
-router.put("/:id", upload.array("images", 5), updateProduct);
-router.delete("/:id", deleteProduct);
+// ==================================================================
+// PROTECTED ROUTES (Management)
+// ==================================================================
+
+// ১. লগইন চেক (সবার জন্য)
+router.use(verifyToken);
+
+// ২. ক্রিয়েট (Create) - Permission: product.create
+// ফাইল আপলোডের আগে পারমিশন চেক করা হচ্ছে (Best Practice)
+router.post(
+  "/create", 
+  checkPermission("product.create"), 
+  upload.array("images", 5), 
+  createProduct
+);
+
+// ৩. আপডেট (Edit) - Permission: product.edit
+router.put(
+  "/:id", 
+  checkPermission("product.edit"), 
+  upload.array("images", 5), 
+  updateProduct
+);
+
+// ৪. ডিলিট (Delete) - Permission: product.delete
+router.delete(
+  "/:id", 
+  checkPermission("product.delete"), 
+  deleteProduct
+);
 
 module.exports = router;

@@ -1,42 +1,59 @@
 const express = require("express");
 const router = express.Router();
 const { 
-    createCategory, 
-    getAllCategories, 
-    getCategoryTree, 
-    updateCategory, 
-    deleteCategory 
+  createCategory, 
+  getAllCategories, 
+  getCategoryTree, 
+  updateCategory, 
+  deleteCategory 
 } = require("../controller/categoryController");
 
 // Middlewares
 const upload = require("../middlewares/upload");
-const { verifyToken, isAdmin } = require("../middlewares/authMiddleware");
+// 🔥 isAdmin এর বদলে checkPermission ইম্পোর্ট করা হলো
+const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
 
-// Public Routes (সবাই ক্যাটাগরি দেখতে পাবে)
-router.get("/", getAllCategories); // ফ্ল্যাট লিস্ট (এডমিনের জন্য ভালো)
-router.get("/tree", getCategoryTree); // নেস্টেড লিস্ট (মেনুবারের জন্য ভালো)
+// ==================================================================
+// PUBLIC ROUTES (Storefront & Admin View)
+// ==================================================================
+// ক্যাটাগরি ডাটা পাবলিকলি এভেলেবল থাকা স্ট্যান্ডার্ড (কাস্টমারদের জন্য)
+router.get("/", getAllCategories); // Flat List
+router.get("/tree", getCategoryTree); // Nested List
 
-// Protected Routes (Create/Edit/Delete only Admin)
-router.use(verifyToken, isAdmin);
+// ==================================================================
+// PROTECTED ROUTES (Management)
+// ==================================================================
 
+// ১. নিচের সব রাউটে লগইন বাধ্যতামূলক
+router.use(verifyToken);
+
+// ২. ক্রিয়েট (Create) - Permission: category.manage
 router.post(
-    "/create", 
-    upload.fields([
-        { name: 'image', maxCount: 1 }, 
-        { name: 'icon', maxCount: 1 }
-    ]), 
-    createCategory
+  "/create", 
+  checkPermission("category.manage"), // 🔥 Check Permission
+  upload.fields([
+      { name: 'image', maxCount: 1 }, 
+      { name: 'icon', maxCount: 1 }
+  ]), 
+  createCategory
 );
 
+// ৩. আপডেট (Update) - Permission: category.manage
 router.put(
-    "/:id", 
-    upload.fields([
-        { name: 'image', maxCount: 1 }, 
-        { name: 'icon', maxCount: 1 }
-    ]), 
-    updateCategory
+  "/:id", 
+  checkPermission("category.manage"), // 🔥 Check Permission
+  upload.fields([
+      { name: 'image', maxCount: 1 }, 
+      { name: 'icon', maxCount: 1 }
+  ]), 
+  updateCategory
 );
 
-router.delete("/:id", deleteCategory);
+// ৪. ডিলিট (Delete) - Permission: category.manage
+router.delete(
+  "/:id", 
+  checkPermission("category.manage"), // 🔥 Check Permission
+  deleteCategory
+);
 
 module.exports = router;

@@ -9,6 +9,7 @@ const reviewRoutes = require("./routes/reviewRoutes");
 const abandonedRoutes = require("./routes/abandonedRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -19,6 +20,7 @@ router.use("/reviews", reviewRoutes);
 router.use("/abandoned", abandonedRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
+router.use("/admins", adminRoutes);
 
 module.exports = router;
 
