@@ -10,6 +10,9 @@ const abandonedRoutes = require("./routes/abandonedRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const customerRoutes = require("./routes/customerRoutes");
+const smsGatewayRoutes = require("./routes/smsGatewayRoutes");
+const marketingRoutes = require("./routes/marketingRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -21,6 +24,10 @@ router.use("/abandoned", abandonedRoutes);
 router.use("/orders", orderRoutes);
 router.use("/payments", paymentRoutes);
 router.use("/admins", adminRoutes);
+router.use("/customers", customerRoutes);
+router.use("/sms-gateways", smsGatewayRoutes);
+router.use("/marketing", marketingRoutes);
+    
 
 module.exports = router;
 
