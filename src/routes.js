@@ -16,6 +16,7 @@ const marketingRoutes = require("./routes/marketingRoutes");
 const courierSettingRoutes = require("./routes/courierSettingRoutes");
 const shippingSettingRoutes = require("./routes/shippingSettingRoutes");
 const socialMediaRoutes = require("./routes/socialMediaRoutes");
+const pixelSettingRoutes = require("./routes/pixelSettingRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -33,7 +34,7 @@ router.use("/marketing", marketingRoutes);
 router.use("/courier-settings", courierSettingRoutes);
 router.use("/shipping-settings", shippingSettingRoutes);
 router.use("/social-media", socialMediaRoutes);
-
+router.use("/pixel-settings", pixelSettingRoutes);
 
 module.exports = router;
 
