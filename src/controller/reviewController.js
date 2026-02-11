@@ -80,22 +80,41 @@ exports.getProductReviews = async (req, res, next) => {
   }
 };
 
-// 3. ADMIN: Get All Reviews (Pending Filter Optional)
+// 3. ADMIN: Get All Reviews (With Pagination & Product Filter)
 exports.getAllReviewsAdmin = async (req, res, next) => {
   try {
-    const { status } = req.query; // ?status=pending or ?status=approved
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const { status, productId } = req.query;
+
     let query = {};
     
     if (status === "pending") query.isApproved = false;
     if (status === "approved") query.isApproved = true;
+    if (productId) query.product = productId; // 🔥 Product Based Filter
+
+    const skip = (page - 1) * limit;
 
     const reviews = await Review.find(query)
-        .populate("product", "title slug") // কোন প্রোডাক্টের রিভিউ সেটা দেখার জন্য
-        .sort({ createdAt: -1 });
+        .populate("product", "title slug")
+        .populate("user", "name avatar") 
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    const totalDocuments = await Review.countDocuments(query);
+    const totalPages = Math.ceil(totalDocuments / limit);
 
     res.status(200).json({
       success: true,
-      count: reviews.length,
+      meta: {
+        totalReviews: totalDocuments,
+        totalPages: totalPages,
+        currentPage: page,
+        reviewsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      },
       data: reviews
     });
   } catch (error) {
