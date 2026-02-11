@@ -19,6 +19,7 @@ const socialMediaRoutes = require("./routes/socialMediaRoutes");
 const pixelSettingRoutes = require("./routes/pixelSettingRoutes");
 const webPageRoutes = require("./routes/webPageRoutes");
 const mediaRoutes = require("./routes/mediaRoutes");
+const generalSettingRoutes = require("./routes/generalSettingRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -39,6 +40,7 @@ router.use("/social-media", socialMediaRoutes);
 router.use("/pixel-settings", pixelSettingRoutes);
 router.use("/web-pages", webPageRoutes);
 router.use("/media", mediaRoutes);
+router.use("/general-settings", generalSettingRoutes);
 
 
 module.exports = router;

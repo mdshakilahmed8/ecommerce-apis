@@ -36,3 +36,33 @@ exports.uploadEditorImage = async (req, res, next) => {
     res.status(500).json({ errorMessage: "Failed to upload image to server." });
   }
 };
+
+
+// ২. Standard Image Upload (For Logos, Products, Banners, etc.)
+exports.uploadImage = async (req, res, next) => {
+  try {
+    const file = req.file; 
+    if (!file) {
+      return res.status(400).json({ success: false, message: "No image file provided." });
+    }
+
+    // Convert buffer to Data URI
+    const b64 = Buffer.from(file.buffer).toString("base64");
+    let dataURI = "data:" + file.mimetype + ";base64," + b64;
+
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(dataURI, {
+      folder: "ecommerce_general_media", // ক্লাউডিনারিতে ফোল্ডার
+    });
+
+    // সিম্পল রেসপন্স, শুধু URL পাঠাবে
+    res.status(200).json({
+      success: true,
+      url: result.secure_url,
+      message: "Image uploaded successfully"
+    });
+  } catch (error) {
+    console.error("Cloudinary Upload Error:", error);
+    res.status(500).json({ success: false, message: "Failed to upload image." });
+  }
+};
