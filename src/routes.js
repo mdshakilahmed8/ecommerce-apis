@@ -13,6 +13,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const customerRoutes = require("./routes/customerRoutes");
 const smsGatewayRoutes = require("./routes/smsGatewayRoutes");
 const marketingRoutes = require("./routes/marketingRoutes");
+const courierSettingRoutes = require("./routes/courierSettingRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -27,7 +28,7 @@ router.use("/admins", adminRoutes);
 router.use("/customers", customerRoutes);
 router.use("/sms-gateways", smsGatewayRoutes);
 router.use("/marketing", marketingRoutes);
-    
+router.use("/courier-settings", courierSettingRoutes);
 
 module.exports = router;
 
