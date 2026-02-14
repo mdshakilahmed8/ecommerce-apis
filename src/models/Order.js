@@ -54,7 +54,8 @@ const orderSchema = new mongoose.Schema({
   courier: {
     provider: String, 
     trackingId: String,
-    link: String
+    link: String,
+    courierId: String, 
   },
 
   // 8. Finance: Courier Settlement

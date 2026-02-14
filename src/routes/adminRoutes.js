@@ -5,7 +5,12 @@ const {
   getAllAdmins, 
   getAdminById, 
   updateAdmin, 
-  deleteAdmin 
+  deleteAdmin, 
+  blockIp,
+  unblockIp,
+  checkIpStatus,
+  checkPublicIpStatus,
+  getAllBlockedIps
 } = require("../controller/adminController");
 
 const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
@@ -38,5 +43,6 @@ router.route("/:id")
       checkPermission("admin.delete"), // ডিলিট করার পারমিশন
       deleteAdmin
   );
+  
 
 module.exports = router;

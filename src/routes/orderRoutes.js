@@ -2,12 +2,16 @@ const express = require("express");
 const router = express.Router();
 const { 
     initiateOrder, verifyOrderOTP, myOrders, getSingleOrder, 
-    getAllOrdersAdmin, updateOrderStatus, assignOrder, addOrderLog, settleCourierPayments
+    getAllOrdersAdmin, updateOrderStatus, assignOrder, addOrderLog, settleCourierPayments,
+    updateOrderStatusBulk, updateCRMStatus, 
+    updateOrderDetailsFull,
+    createPosOrder
 } = require("../controller/orderController");
 
-// 🔥 isAdmin এর বদলে checkPermission ইম্পোর্ট
 const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
+const { checkSteadfastFraud, pushToSteadfast } = require("../controller/courierController");
 
+// Optional Token Verification for Guest Orders
 const optionalVerifyToken = (req, res, next) => {
     if (req.headers.authorization) verifyToken(req, res, next);
     else next();
@@ -20,57 +24,57 @@ router.post("/initiate", optionalVerifyToken, initiateOrder);
 router.post("/verify-create", verifyOrderOTP); 
 
 // ==================================================================
-// 🛡️ ADMIN ROUTES (Staff Management)
+// 🛡️ ADMIN ROUTES
 // ==================================================================
 
-// ১. সব অর্ডার দেখা (View Permission)
-router.get(
-    "/admin/all", 
-    verifyToken, 
-    checkPermission("order.view"), // শুধু দেখার পারমিশন
-    getAllOrdersAdmin
-);
+// 1. Get All Orders (View Permission)
+// ✅ PERMISSIONS.ORDER.VIEW = "order.view"
+router.get("/admin/all", verifyToken, checkPermission("order.view"), getAllOrdersAdmin);
 
-// ২. অর্ডার স্ট্যাটাস আপডেট (Manage Permission)
+// 2. Public Status Update
+router.put("/admin/update/:id", verifyToken, checkPermission("order.edit"), updateOrderStatus);
+
+// 3. Full Order Update (Details Edit)
 router.put(
-    "/admin/update/:id", 
+    "/admin/update-full/:id", 
     verifyToken, 
-    checkPermission("order.manage"), // এডিট/ম্যানেজ পারমিশন
-    updateOrderStatus
+    checkPermission("order.edit"), 
+    updateOrderDetailsFull
 );
 
-// ৩. ডেলিভারি ম্যান বা স্টাফ অ্যাসাইন করা (Manage Permission)
-router.put(
-    "/admin/assign/:orderId", 
-    verifyToken, 
-    checkPermission("order.manage"), 
-    assignOrder
-);
+// 4. Assign Staff (CRM)
+router.patch("/admin/assign/:orderId", verifyToken, checkPermission("order.edit"), assignOrder);
 
-// ৪. ইন্টারনাল লগ বা নোট লেখা (Manage Permission)
-router.put(
-    "/admin/log/:orderId", 
-    verifyToken, 
-    checkPermission("order.manage"), 
-    addOrderLog
-);
+// 5. CRM Internal Status Update
+router.patch("/admin/crm-status/:orderId", verifyToken, checkPermission("order.edit"), updateCRMStatus);
 
-// ৫. কুরিয়ার পেমেন্ট সেটেলমেন্ট (Manage Permission)
+// 6. Add Log
+router.put("/admin/log/:orderId", verifyToken, checkPermission("order.edit"), addOrderLog);
+
+// 7. Courier Settlement (Financial Edit)
+router.post("/admin/settle-courier", verifyToken, checkPermission("order.edit"), settleCourierPayments);
+
+// 8. Bulk Status Update
+router.put("/admin/update-status-bulk", verifyToken, checkPermission("order.edit"), updateOrderStatusBulk);
+
+// 9. Steadfast Integration
+router.get("/admin/steadfast/fraud-check/:phone", verifyToken, checkPermission("order.edit"), checkSteadfastFraud);
+router.post("/admin/steadfast/push", verifyToken, checkPermission("order.edit"), pushToSteadfast);
+
+
+// ✅ NEW: POS Order Create Route
+// এটি শুধু এডমিন এক্সেস করতে পারবে
 router.post(
-    "/admin/settle-courier", 
+    "/admin/pos/create", 
     verifyToken, 
-    checkPermission("order.manage"), 
-    settleCourierPayments
+    checkPermission("order.create"),
+    createPosOrder
 );
 
 // ==================================================================
-// 👤 USER ROUTES (My Orders)
+// 👤 USER ROUTES
 // ==================================================================
 router.get("/my-orders", verifyToken, myOrders);
-
-// সিঙ্গেল অর্ডার: 
-// এটি কাস্টমার নিজের অর্ডার দেখার জন্য ব্যবহার করে, আবার এডমিনও ডিটেইলস দেখার জন্য ব্যবহার করতে পারে।
-// কন্ট্রোলারের ভেতরে লজিক থাকা উচিত: যদি এডমিন হয় তবে সব দেখবে, কাস্টমার হলে শুধু নিজেরটা।
-router.get("/:id", verifyToken, getSingleOrder); 
+router.get("/:id", verifyToken, getSingleOrder);
 
 module.exports = router;
