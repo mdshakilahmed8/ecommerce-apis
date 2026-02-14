@@ -42,12 +42,24 @@ const abandonedCheckoutSchema = new mongoose.Schema({
     enum: ["cart_view", "checkout_init", "shipping_info", "payment_method"],
     default: "checkout_init"
   },
+
+    management: {
+        assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        status: { type: String, enum: ["new", "processing", "follow_up", "confirmed", "cancelled"], default: "new" },
+        logs: [{
+            action: String,
+            note: String, 
+            admin: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+            date: { type: Date, default: Date.now }
+        }]
+    },
+  
   
   isRecovered: { type: Boolean, default: false }, 
   isRecoveredByOrder: { type: mongoose.Schema.Types.ObjectId, ref: "Order" }
 
 }, { timestamps: true });
 
-abandonedCheckoutSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 }); // ৩০ দিন পর ডিলিট
+abandonedCheckoutSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
 
 module.exports = mongoose.model("AbandonedCheckout", abandonedCheckoutSchema);
