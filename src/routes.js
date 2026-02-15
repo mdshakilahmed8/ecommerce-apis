@@ -21,6 +21,7 @@ const webPageRoutes = require("./routes/webPageRoutes");
 const mediaRoutes = require("./routes/mediaRoutes");
 const generalSettingRoutes = require("./routes/generalSettingRoutes");
 const ipRoutes = require("./routes/ipRoute");
+const dashboardRoutes = require("./routes/dashboardRoute");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -43,6 +44,7 @@ router.use("/web-pages", webPageRoutes);
 router.use("/media", mediaRoutes);
 router.use("/general-settings", generalSettingRoutes);
 router.use("/ip-block", ipRoutes);
+router.use("/dashboard", dashboardRoutes);
 
 
 module.exports = router;
