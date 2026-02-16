@@ -22,6 +22,7 @@ const mediaRoutes = require("./routes/mediaRoutes");
 const generalSettingRoutes = require("./routes/generalSettingRoutes");
 const ipRoutes = require("./routes/ipRoute");
 const dashboardRoutes = require("./routes/dashboardRoute");
+const reportRoutes = require("./routes/reportRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -45,6 +46,7 @@ router.use("/media", mediaRoutes);
 router.use("/general-settings", generalSettingRoutes);
 router.use("/ip-block", ipRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/reports", reportRoutes);
 
 
 module.exports = router;
