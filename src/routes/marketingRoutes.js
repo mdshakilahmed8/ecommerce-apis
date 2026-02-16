@@ -11,6 +11,9 @@ const {
     deleteLandingPage 
 } = require("../controller/landingPageController");
 
+
+const { createCoupon, getAllCoupons, updateCoupon, deleteCoupon, applyCoupon } = require("../controller/couponController");
+
 router.use(verifyToken);
 
 router.post("/send-sms", checkPermission("sms.send"), sendBulkSms);
@@ -62,6 +65,17 @@ router.delete(
     checkPermission("landing_page.delete"), 
     deleteLandingPage
 );
+
+
+
+// Admin Routes
+router.post("/coupons", verifyToken, checkPermission("marketing.manage"), createCoupon);
+router.get("/coupons", verifyToken, checkPermission("marketing.view"), getAllCoupons);
+router.put("/coupons/:id", verifyToken, checkPermission("marketing.manage"), updateCoupon);
+router.delete("/coupons/:id", verifyToken, checkPermission("marketing.delete"), deleteCoupon);
+
+// Public Route (Checkout)
+router.post("/coupons/apply", applyCoupon);
 
 
 
