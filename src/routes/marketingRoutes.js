@@ -14,6 +14,8 @@ const {
 
 const { createCoupon, getAllCoupons, updateCoupon, deleteCoupon, applyCoupon } = require("../controller/couponController");
 
+const { createSlide, getAllSlides, updateSlide, deleteSlide } = require("../controller/heroSliderController");
+
 router.use(verifyToken);
 
 router.post("/send-sms", checkPermission("sms.send"), sendBulkSms);
@@ -76,6 +78,13 @@ router.delete("/coupons/:id", verifyToken, checkPermission("marketing.delete"), 
 
 // Public Route (Checkout)
 router.post("/coupons/apply", applyCoupon);
+
+
+// Hero Slider Routes
+router.post("/sliders", verifyToken, checkPermission("marketing.manage"), createSlide);
+router.get("/sliders", getAllSlides); // Publicly accessible (controller handles filtering)
+router.put("/sliders/:id", verifyToken, checkPermission("marketing.manage"), updateSlide);
+router.delete("/sliders/:id", verifyToken, checkPermission("marketing.delete"), deleteSlide);
 
 
 
