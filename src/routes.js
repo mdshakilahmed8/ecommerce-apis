@@ -23,6 +23,7 @@ const generalSettingRoutes = require("./routes/generalSettingRoutes");
 const ipRoutes = require("./routes/ipRoute");
 const dashboardRoutes = require("./routes/dashboardRoute");
 const reportRoutes = require("./routes/reportRoutes");
+const globalRoutes = require("./routes/globalRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -48,6 +49,7 @@ router.use("/ip-block", ipRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/reports", reportRoutes);
 
+router.use("/global", globalRoutes);
 
 module.exports = router;
 

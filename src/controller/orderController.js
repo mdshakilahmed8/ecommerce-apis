@@ -10,6 +10,8 @@ const crypto = require("crypto");
 const { initiatePayment } = require("./paymentController"); 
 const sendSms = require("../utils/smsSender");
 const GeneralSetting = require("../models/GeneralSetting");
+const { createAdminNotification } = require("../utils/notificationHelper");
+const { title } = require("process");
 
 // ==========================================
 // 🛠️ HELPERS
@@ -723,6 +725,15 @@ exports.createPosOrder = async (req, res, next) => {
 
         const result = await placeOrderInternal(orderData, user, ip, { sendOrderSms: false });
 
+
+        await createAdminNotification(
+            "New POS Order", 
+            `A new POS order (${result.order.orderId}) has been created.`, 
+            "order", 
+            `/admin/orders/${result.order._id}`
+        );
+
+        
         // ৫. রেসপন্স (newUser বাদ দেওয়া হয়েছে)
         res.status(201).json({
             success: true,
