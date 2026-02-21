@@ -79,23 +79,25 @@ exports.getAllCategories = async (req, res, next) => {
 // 3. Get Category Tree (Nested JSON for Frontend Sidebar/Menu)
 exports.getCategoryTree = async (req, res, next) => {
   try {
-    const categories = await Category.find().sort({ order: 1 });
+    const categories = await Category.find().sort({ order: 1 }).lean();
 
-    // রিকার্সিভ ফাংশন দিয়ে ট্রি বানানো
-    const buildTree = (parentId = null) => {
-      return categories
-        .filter(cat => String(cat.parentId) === String(parentId)) // যাদের প্যারেন্ট আইডি মিলবে
-        .map(cat => ({
-          _id: cat._id,
-          name: cat.name,
-          slug: cat.slug,
-          icon: cat.icon,
-          image: cat.image,
-          children: buildTree(cat._id) // আবার নিজের আইডি দিয়ে চাইল্ড খুঁজবে
-        }));
-    };
+    // ম্যাপ তৈরি করা যাতে দ্রুত আইডি দিয়ে ডাটা খুঁজে পাওয়া যায়
+    const categoryMap = {};
+    categories.forEach(cat => {
+      categoryMap[cat._id] = { ...cat, children: [] };
+    });
 
-    const treeData = buildTree(null); // রুট লেভেল (যাদের প্যারেন্ট null) থেকে শুরু
+    const treeData = [];
+
+    categories.forEach(cat => {
+      // যদি parentId থাকে, তাহলে তাকে তার ম্যাপের প্যারেন্টের children হিসেবে ঢুকিয়ে দাও
+      if (cat.parentId && categoryMap[cat.parentId]) {
+        categoryMap[cat.parentId].children.push(categoryMap[cat._id]);
+      } else {
+        // যদি parentId না থাকে (null/empty), তবে সেটি root/main ক্যাটাগরি
+        treeData.push(categoryMap[cat._id]);
+      }
+    });
 
     res.status(200).json({
       success: true,
