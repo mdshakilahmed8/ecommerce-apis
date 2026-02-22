@@ -1,11 +1,11 @@
+// File: controllers/paymentController.js
+
 const SSLCommerzPayment = require('sslcommerz-lts');
 const PaymentSetting = require("../models/PaymentSetting");
 const Order = require("../models/Order");
 const createError = require("http-errors");
 const axios = require("axios");
 const { v4: uuidv4 } = require('uuid');
-
-
 
 // ======================================================
 // 🚀 MASTER INITIATE FUNCTION
@@ -43,7 +43,7 @@ exports.initiatePayment = async (order) => {
 };
 
 // ------------------------------------------------------
-// 🔹 1. SSL COMMERZ LOGIC (FIXED: Added Shipping Info)
+// 🔹 1. SSL COMMERZ LOGIC 
 // ------------------------------------------------------
 const initiateSSLCommerz = async (order, settings, productNames, category) => {
     
@@ -67,7 +67,7 @@ const initiateSSLCommerz = async (order, settings, productNames, category) => {
         product_category: category,
         product_profile: 'general',
         
-        // ✅ Customer Info
+        // Customer Info
         cus_name: order.shippingAddress.fullName,
         cus_email: customerEmail,
         cus_add1: order.shippingAddress.fullAddress,
@@ -77,8 +77,7 @@ const initiateSSLCommerz = async (order, settings, productNames, category) => {
         cus_country: 'Bangladesh',
         cus_phone: order.shippingAddress.phone.number,
         
-        // 🔥 FIX: Shipping Info (MANDATORY for SSLCommerz)
-        // আমরা শিপিং এড্রেস হিসেবে কাস্টমারের এড্রেসটাই কপি করে দিচ্ছি
+        // Shipping Info (MANDATORY for SSLCommerz)
         ship_name: order.shippingAddress.fullName,
         ship_add1: order.shippingAddress.fullAddress,
         ship_add2: order.shippingAddress.address || "",
@@ -99,20 +98,16 @@ const initiateSSLCommerz = async (order, settings, productNames, category) => {
             return apiResponse.GatewayPageURL;
         } else {
             console.error("SSL Error Response:", apiResponse);
-            // এখানে নির্দিষ্ট কারণ থাকলে সেটা দেখাবে, নাহলে জেনেরিক মেসেজ
             const reason = apiResponse?.failedreason || "Invalid Store Credentials";
             throw new Error(reason);
         }
     } catch (error) {
-        // এই এররটা Order Controller এর catch ব্লকে যাবে
         throw new Error(error.message);
     }
 };
 
-
-
 // ------------------------------------------------------
-// 🔹 2. BKASH DIRECT LOGIC
+// 🔹 2. BKASH DIRECT LOGIC (🔥 UPDATED for Failure Tracking)
 // ------------------------------------------------------
 const initiateBkashDirect = async (order, settings) => {
     const bkashBaseUrl = settings.isSandbox 
@@ -134,7 +129,7 @@ const initiateBkashDirect = async (order, settings) => {
             {
                 mode: "0011",
                 payerReference: order.shippingAddress.phone.number,
-                callbackURL: `${process.env.BASE_URL}/api/v1/payment/bkash/callback`,
+                callbackURL: `${process.env.BASE_URL}/api/v1/payments/bkash/callback`, 
                 amount: order.grandTotal,
                 currency: "BDT",
                 intent: "sale",
@@ -145,9 +140,10 @@ const initiateBkashDirect = async (order, settings) => {
             }
         );
 
-        // Store Token in Order for Execution Step
+        // 🔥 FIX: paymentID ডাটাবেসে সেভ করে রাখছি যাতে ফেইল হলে অর্ডার খুঁজে বের করতে পারি
         await Order.findByIdAndUpdate(order._id, { 
-            "courierSettlement.note": idToken 
+            "courierSettlement.note": idToken,
+            "courierSettlement.transactionId": paymentResponse.data.paymentID 
         });
 
         return paymentResponse.data.bkashURL;
@@ -162,19 +158,10 @@ const initiateBkashDirect = async (order, settings) => {
 // 🔹 3. NAGAD DIRECT LOGIC (Placeholder)
 // ------------------------------------------------------
 const initiateNagadDirect = async (order, settings) => {
-    // Note: Nagad Direct requires a public/private key encryption helper.
-    // If you don't have the encryption util, use SSLCommerz for Nagad.
-    // Assuming we have a mock URL generation for now:
-    
-    // Check if storeId exists
     if(!settings.storeId) throw createError(500, "Nagad Merchant ID missing");
     
-    // For now, let's fallback to SSLCommerz if Nagad logic is too complex for this file
-    // Or return a dummy link if sandbox
     if(settings.isSandbox) {
-        // Just for testing flow (In production, use Nagad SDK)
         console.log("Nagad Direct triggered (Sandbox)");
-        // throw createError(501, "Direct Nagad requires Encryption Library. Use SSLCommerz instead.");
          const sslSettings = await PaymentSetting.findOne({ provider: "sslcommerz", isActive: true });
          return await initiateSSLCommerz(order, sslSettings);
     }
@@ -185,7 +172,7 @@ const initiateNagadDirect = async (order, settings) => {
 
 
 // ======================================================
-// ✅ CALLBACK HANDLERS
+// ✅ CALLBACK HANDLERS (UPDATED)
 // ======================================================
 
 // 1. SSL Success
@@ -195,6 +182,7 @@ exports.sslSuccess = async (req, res, next) => {
         const { val_id } = req.body; 
 
         const order = await Order.findOne({ orderId });
+        
         if (!order) return res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
 
         order.paymentStatus = "paid";
@@ -202,32 +190,48 @@ exports.sslSuccess = async (req, res, next) => {
         order.courierSettlement.isSettled = true;
         order.courierSettlement.transactionId = val_id;
         order.courierSettlement.note = "Paid via SSLCommerz";
+        
+        order.timeline.push({ 
+            status: "confirmed", 
+            date: new Date(), 
+            note: "Payment successful via SSLCommerz" 
+        });
+
         await order.save();
 
         res.redirect(`${process.env.FRONTEND_URL}/order-success/${orderId}`);
     } catch (error) { next(error); }
 };
 
-// 2. bKash Callback
+// 2. bKash Callback (🔥 UPDATED)
 exports.bkashCallback = async (req, res, next) => {
     try {
         const { paymentID, status } = req.query;
 
+        // 🔥 FIX: ইনিশিয়েট করার সময় যে paymentID সেভ করেছিলাম, তা দিয়ে অর্ডার খুঁজে বের করা
+        const order = await Order.findOne({ "courierSettlement.transactionId": paymentID });
+
+        // ১. যদি ইউজার bKash পেজ থেকে Cancel করে দেয় বা ফেইল হয়
         if (status === 'cancel' || status === 'failure') {
+            if (order) {
+                order.paymentStatus = "failed";
+                order.timeline.push({ 
+                    status: order.status, 
+                    date: new Date(), 
+                    note: `bKash Payment ${status === 'cancel' ? 'Cancelled by User' : 'Failed'}.` 
+                });
+                await order.save();
+            }
             return res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
         }
 
-        // We stored the token in an order, but bKash doesn't return OrderID in callback query params easily.
-        // We have to find the order by some logic or use the PaymentID if we saved it.
-        // For simplicity: We fetch Settings again.
-        
         const settings = await PaymentSetting.findOne({ provider: "bkash", isActive: true });
         
         const bkashBaseUrl = settings.isSandbox 
             ? "https://tokenized.sandbox.bka.sh/v1.2.0-beta" 
             : "https://tokenized.pay.bka.sh/v1.2.0-beta";
 
-        // Re-generate token (Safest way without session)
+        // Re-generate token
         const tokenResponse = await axios.post(
             `${bkashBaseUrl}/tokenized/checkout/token/grant`,
             { app_key: settings.storeId, app_secret: settings.storePassword },
@@ -242,26 +246,66 @@ exports.bkashCallback = async (req, res, next) => {
             { headers: { Authorization: idToken, "X-APP-Key": settings.storeId } }
         );
 
+        // ২. যদি এক্সিকিউট সাকসেস হয়
         if (executeRes.data && executeRes.data.statusCode === '0000') {
-            const orderId = executeRes.data.merchantInvoiceNumber;
-            const order = await Order.findOne({ orderId });
-
             if(order) {
                 order.paymentStatus = "paid";
                 order.status = "confirmed";
                 order.courierSettlement.isSettled = true;
-                order.courierSettlement.transactionId = executeRes.data.trxID;
+                order.courierSettlement.transactionId = executeRes.data.trxID; // Real TrxID
                 order.courierSettlement.note = "Paid via Direct bKash";
+                
+                order.timeline.push({ 
+                    status: "confirmed", 
+                    date: new Date(), 
+                    note: "Payment successful via bKash" 
+                });
+
                 await order.save();
-                return res.redirect(`${process.env.FRONTEND_URL}/order-success/${orderId}`);
+                return res.redirect(`${process.env.FRONTEND_URL}/order-success/${order.orderId}`);
             }
         } 
+        // ৩. যদি পিন ভুল বা অন্য কারণে এক্সিকিউট ফেইল হয়
+        else if (executeRes.data) {
+            if (order) {
+                order.paymentStatus = "failed";
+                order.timeline.push({ 
+                    status: order.status, 
+                    date: new Date(), 
+                    note: `bKash Payment Failed. Reason: ${executeRes.data.statusMessage || 'Unknown'}` 
+                });
+                await order.save();
+            }
+        }
         
         return res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
 
     } catch (error) { next(error); }
 };
 
+// 3. Common Fail / Cancel Callback (🔥 UPDATED)
 exports.paymentFail = async (req, res, next) => {
-    res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
+    try {
+        const { orderId } = req.params;
+
+        if (orderId) {
+            const order = await Order.findOne({ orderId });
+            
+            if (order) {
+                order.paymentStatus = "failed";
+                order.timeline.push({ 
+                    status: order.status, 
+                    date: new Date(), 
+                    note: "Payment Gateway reported failure or user cancelled the payment." 
+                });
+
+                await order.save();
+            }
+        }
+
+        res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
+    } catch (error) {
+        console.error("Payment Fail Update Error:", error);
+        res.redirect(`${process.env.FRONTEND_URL}/payment/fail`);
+    }
 };
