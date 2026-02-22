@@ -20,6 +20,9 @@ const { createSlide, getAllSlides, updateSlide, deleteSlide } = require("../cont
 
 // Public routes
 router.get("/sliders", getAllSlides);
+// Public Route (Checkout)
+router.post("/coupons/apply", applyCoupon);
+
 
 
 router.use(verifyToken);
@@ -82,8 +85,6 @@ router.get("/coupons", verifyToken, checkPermission("marketing.view"), getAllCou
 router.put("/coupons/:id", verifyToken, checkPermission("marketing.manage"), updateCoupon);
 router.delete("/coupons/:id", verifyToken, checkPermission("marketing.delete"), deleteCoupon);
 
-// Public Route (Checkout)
-router.post("/coupons/apply", applyCoupon);
 
 
 // Hero Slider Routes

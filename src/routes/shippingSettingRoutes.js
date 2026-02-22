@@ -7,14 +7,15 @@ const {
 
 const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
 
-// ১. অথেন্টিকেশন চেক
-router.use(verifyToken);
+
 
 // ২. রাউটস (Permission Checks Added)
 router.get("/", 
-    checkPermission("shipping.view"), 
     getShippingSettings
 );
+
+// ১. অথেন্টিকেশন চেক
+router.use(verifyToken);
 
 router.post("/", 
     checkPermission("shipping.edit"), 
