@@ -292,3 +292,31 @@ exports.deleteProduct = async (req, res, next) => {
 };
 
 
+// 6. Get Related Products (By Category)
+exports.getRelatedProducts = async (req, res, next) => {
+  try {
+    const { id } = req.params; // কারেন্ট প্রোডাক্টের ID
+
+    // কারেন্ট প্রোডাক্টটা বের করা যাতে ক্যাটাগরি পাই
+    const product = await Product.findById(id);
+    if (!product) throw createError(404, "Product not found");
+
+    // একই ক্যাটাগরির অন্য প্রোডাক্ট খুঁজবো (বর্তমান প্রোডাক্টটা বাদ দিয়ে)
+    const relatedProducts = await Product.find({
+      category: product.category,
+      _id: { $ne: product._id },
+      isPublished: true
+    })
+    .select("title slug price discountPrice images ratingsAverage stock") // শুধু দরকারি ফিল্ড
+    .limit(5) // ম্যাক্সিমাম ৫টা
+    .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      data: relatedProducts
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};

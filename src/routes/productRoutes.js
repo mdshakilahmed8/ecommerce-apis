@@ -5,7 +5,8 @@ const {
   getAllProducts, 
   getProductBySlug, 
   updateProduct, 
-  deleteProduct 
+  deleteProduct,
+  getRelatedProducts
 } = require("../controller/productController");
 
 // Middlewares
@@ -18,6 +19,7 @@ const { verifyToken, checkPermission } = require("../middlewares/authMiddleware"
 // ==================================================================
 // প্রোডাক্ট দেখা সবার জন্য উন্মুক্ত
 router.get("/", getAllProducts); 
+router.get("/related/:id", getRelatedProducts); 
 router.get("/:slug", getProductBySlug); 
 
 
