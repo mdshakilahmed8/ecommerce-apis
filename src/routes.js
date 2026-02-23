@@ -24,6 +24,7 @@ const ipRoutes = require("./routes/ipRoute");
 const dashboardRoutes = require("./routes/dashboardRoute");
 const reportRoutes = require("./routes/reportRoutes");
 const globalRoutes = require("./routes/globalRoutes");
+const userRoutes = require('./routes/userRoutes')
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -50,6 +51,7 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/reports", reportRoutes);
 
 router.use("/global", globalRoutes);
+router.use('/user', userRoutes)
 
 module.exports = router;
 

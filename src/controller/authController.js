@@ -1,3 +1,5 @@
+// File: controllers/authController.js
+
 const User = require("../models/User");
 const Otp = require("../models/Otp");
 const Role = require("../models/Role");
@@ -7,7 +9,6 @@ const { secretKey, accessTokenExpiration, refreshTokenExpiration } = require("..
 
 // --- 1. REGISTER USER ---
 exports.registerUser = async (req, res, next) => {
-  // ... (রেজিস্ট্রেশন কোড ঠিক আছে, কোনো চেঞ্জ লাগবে না)
   try {
     const { fullName, email, countryCode = "880", phoneNumber, password } = req.body;
 
@@ -59,7 +60,7 @@ exports.registerUser = async (req, res, next) => {
     });
 
   } catch (error) {
-    if (error.code === 11000 && error.keyPattern.email) {
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
       return next(createError(409, "Email is already in use by another account."));
     }
     next(error);
@@ -85,7 +86,6 @@ exports.verifyOtp = async (req, res, next) => {
         throw createError(400, "OTP expired.");
     }
 
-    // 🔥 POPULATE ROLE HERE
     const user = await User.findOne({ 
       "phone.countryCode": countryCode, 
       "phone.number": phoneNumber 
@@ -104,10 +104,20 @@ exports.verifyOtp = async (req, res, next) => {
     const accessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration });
     const refreshToken = jwt.sign(payload, secretKey, { expiresIn: refreshTokenExpiration });
 
+    // Set Refresh Token Cookie
     res.cookie("refreshToken", refreshToken, {
-      maxAge: 7 * 24 * 60 * 60 * 1000, 
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true, 
-      secure: process.env.NODE_ENV === "production", 
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      sameSite: "strict",
+      path: "/"
+    });
+
+    // Access Token Cookie
+    res.cookie("accessToken", accessToken, {
+      maxAge: 15 * 60 * 1000, // 15 minutes
+      httpOnly: true, 
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
       sameSite: "strict",
       path: "/"
     });
@@ -119,8 +129,8 @@ exports.verifyOtp = async (req, res, next) => {
         user: {
           _id: user._id,
           name: user.name,
-          // ❌ আগে ছিল: role: user.role.slug 
-          // ✅ এখন হবে: পুরো অবজেক্ট পাঠানো
+          email: user.email,
+          phone: user.phone,
           role: user.role, 
           avatar: user.avatar
         },
@@ -170,9 +180,17 @@ exports.loginUser = async (req, res, next) => {
     const refreshToken = jwt.sign(payload, secretKey, { expiresIn: refreshTokenExpiration });
 
     res.cookie("refreshToken", refreshToken, {
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       httpOnly: true,
-      secure: false, 
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      sameSite: "strict",
+      path:"/"
+    });
+
+    res.cookie("accessToken", accessToken, {
+      maxAge: 15 * 60 * 1000, // 15 mins
+      httpOnly: true,
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
       sameSite: "strict",
       path:"/"
     });
@@ -186,8 +204,6 @@ exports.loginUser = async (req, res, next) => {
           name: user.name,
           email: user.email,
           phone: user.phone,
-          // ❌ আগে ছিল: role: user.role.slug (এটিই সমস্যা ছিল)
-          // ✅ এখন হবে: পুরো role অবজেক্ট পাঠানো
           role: user.role, 
           avatar: user.avatar
         },
@@ -200,76 +216,106 @@ exports.loginUser = async (req, res, next) => {
   }
 };
 
-// ... Logout, ResendOTP, RefreshToken same as before (no changes needed) ...
+// --- 4. LOGOUT USER ---
 exports.logoutUser = async (req, res, next) => {
-    try {
-      res.clearCookie("refreshToken", {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        path: "/" // Logout এও path "/" দেওয়া ভালো
-      });
-  
-      res.status(200).json({
-        success: true,
-        message: "Logged out successfully",
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
+  try {
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      sameSite: "strict",
+      path: "/" 
+    });
 
-  exports.resendOtp = async (req, res, next) => {
-    // ... আপনার আগের কোড ...
-    try {
-        const { countryCode = "880", phoneNumber } = req.body;
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      sameSite: "strict",
+      path: "/" 
+    });
 
-        const user = await User.findOne({ 
-            "phone.countryCode": countryCode, 
-            "phone.number": phoneNumber 
-        });
-
-        if (!user) throw createError(404, "User not found.");
-        if (user.isPhoneVerified) throw createError(400, "User is already verified. Please Login.");
-
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
-        await Otp.create({ 
-            phone: { countryCode, number: phoneNumber }, 
-            otp: otpCode 
-        });
-
-        console.log(`>>> Resend OTP to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
-
-        res.status(200).json({
-            success: true,
-            message: "OTP resent successfully.",
-        });
-
-    } catch (error) {
-        next(error);
-    }
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
+// --- 5. RESEND OTP ---
+exports.resendOtp = async (req, res, next) => {
+  try {
+      const { countryCode = "880", phoneNumber } = req.body;
+
+      const user = await User.findOne({ 
+          "phone.countryCode": countryCode, 
+          "phone.number": phoneNumber 
+      });
+
+      if (!user) throw createError(404, "User not found.");
+      if (user.isPhoneVerified) throw createError(400, "User is already verified. Please Login.");
+
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
+      await Otp.create({ 
+          phone: { countryCode, number: phoneNumber }, 
+          otp: otpCode 
+      });
+
+      console.log(`>>> Resend OTP to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
+
+      res.status(200).json({
+          success: true,
+          message: "OTP resent successfully.",
+      });
+
+  } catch (error) {
+      next(error);
+  }
+};
+
+// --- 6. REFRESH TOKEN (WEB & MOBILE SAFE) ---
 exports.refreshToken = async (req, res, next) => {
-    try {
-        const { refreshToken } = req.cookies;
-        if (!refreshToken) throw createError(401, "Refresh token missing.");
-
-        const decoded = jwt.verify(refreshToken, secretKey);
-        const user = await User.findById(decoded._id).populate("role");
-        if (!user) throw createError(404, "User not found.");
-
-        const payload = { _id: user._id, role: user.role };
-        const newAccessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration });
-
-        res.status(200).json({
-            success: true,
-            accessToken: newAccessToken
-        });
-
-    } catch (error) {
-        next(createError(403, "Invalid or expired refresh token."));
+  try {
+    let token = req.cookies?.refreshToken;
+    if (!token) {
+        token = req.body?.refreshToken || req.headers['x-refresh-token'];
     }
+
+    if (!token) {
+        throw createError(401, "Refresh token not found. Please login again.");
+    }
+
+    const decoded = jwt.verify(token, secretKey);
+
+    const user = await User.findById(decoded._id).populate("role");
+    if (!user || user.status !== "active") {
+        throw createError(401, "User not found or banned. Please login again.");
+    }
+
+    const payload = { _id: user._id, role: user.role };
+    const newAccessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration }); 
+
+    res.cookie("accessToken", newAccessToken, {
+      maxAge: 15 * 60 * 1000, // 15 mins
+      httpOnly: true,
+      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      sameSite: "strict",
+      path: "/"
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Access token refreshed successfully",
+      data: { 
+        accessToken: newAccessToken 
+      } 
+    });
+
+  } catch (error) {
+    res.clearCookie("accessToken");
+    res.clearCookie("refreshToken");
+    next(createError(401, "Session expired. Please login again."));
+  }
 };

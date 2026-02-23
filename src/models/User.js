@@ -55,7 +55,15 @@ const userSchema = new mongoose.Schema({
   isPhoneVerified: { type: Boolean, default: false }, // Customer এর জন্য
   isEmailVerified: { type: Boolean, default: false }, // Admin এর জন্য
   
-  status: { type: String, enum: ["active", "banned"], default: "active" }
+  status: { type: String, enum: ["active", "banned"], default: "active" },
+
+  wishlist: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Product",
+  }
+],
+
 
 }, { timestamps: true });
 
