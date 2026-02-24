@@ -81,3 +81,15 @@ exports.deletePage = async (req, res, next) => {
     next(error);
   }
 };
+
+
+exports.getPageBySlug = async (req, res, next) => {
+  try {
+    const page = await WebPage.findOne({ slug: req.params.slug, isActive: true });
+    if (!page) throw createError(404, "Page not found");
+    
+    res.status(200).json({ success: true, data: page });
+  } catch (error) { 
+    next(error); 
+  }
+};
