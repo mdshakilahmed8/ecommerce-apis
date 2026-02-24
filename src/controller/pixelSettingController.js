@@ -63,3 +63,15 @@ exports.updatePixelSetting = async (req, res, next) => {
       next(error); 
   }
 };
+
+
+exports.getPublicPixelSettings = async (req, res, next) => {
+  try {
+    // শুধুমাত্র isActive: true গুলো পাঠাবো এবং accessToken বা testEventCode পাঠাবো না (Security)
+    const settings = await PixelSetting.find({ isActive: true }).select("-accessToken -testEventCode");
+    
+    res.status(200).json({ success: true, data: settings });
+  } catch (error) { 
+    next(error); 
+  }
+};
