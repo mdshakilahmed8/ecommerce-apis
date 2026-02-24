@@ -320,3 +320,96 @@ exports.getRelatedProducts = async (req, res, next) => {
     next(error);
   }
 };
+
+
+// Advanced Search & Filter API (For Category & Search Pages)
+exports.searchAndFilterProducts = async (req, res, next) => {
+  try {
+    // 1. Extract Query Parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12; // Standard 12 or 16 for grids
+    const { keyword, category, brand, minPrice, maxPrice, sort } = req.query;
+
+    // 2. Build Query Object
+    let query = { isPublished: true };
+
+    // A. Keyword Search (Global Search)
+    if (keyword) {
+      // যদি Product Model-এ Text Index করা থাকে, তাহলে $text ব্যবহার করা ভালো
+      // অথবা $regex দিয়ে ফিল্টার করা যায় (Partial Match)
+      query.$or = [
+        { title: { $regex: keyword, $options: "i" } },
+        { shortDescription: { $regex: keyword, $options: "i" } },
+        { tags: { $in: [new RegExp(keyword, "i")] } }
+      ];
+    }
+
+    // B. Category Filter (Supports multiple categories comma separated)
+    if (category) {
+      const categoryIds = category.split(',');
+      query.category = { $in: categoryIds };
+    }
+
+    // C. Brand Filter (Supports multiple brands comma separated)
+    if (brand) {
+      const brandIds = brand.split(',');
+      query.brand = { $in: brandIds };
+    }
+
+    // D. Price Range Filter
+    if (minPrice || maxPrice) {
+      query.price = {};
+      if (minPrice) query.price.$gte = Number(minPrice);
+      if (maxPrice) query.price.$lte = Number(maxPrice);
+    }
+
+    // 3. Sorting Logic
+    let sortOption = { createdAt: -1 }; // Default: Newest first
+    
+    switch (sort) {
+      case "priceAsc": sortOption = { price: 1 }; break;
+      case "priceDesc": sortOption = { price: -1 }; break;
+      case "topSold": sortOption = { sold: -1 }; break;
+      case "ratingDesc": sortOption = { ratingsAverage: -1 }; break;
+      case "oldest": sortOption = { createdAt: 1 }; break;
+      default: sortOption = { createdAt: -1 }; break;
+    }
+
+    // 4. Pagination Logic
+    const skip = (page - 1) * limit;
+
+    // 5. Execute DB Query
+    const products = await Product.find(query)
+      .populate("category", "name slug")
+      .populate("brand", "name logo slug")
+      .select("-description -variants.attributes") // Exclude heavy text to make API faster
+      .sort(sortOption)
+      .skip(skip)
+      .limit(limit)
+      .lean(); // .lean() makes the query faster as it returns plain JS objects
+
+    // 6. Get Total Count for Pagination
+    const totalProducts = await Product.countDocuments(query);
+    const totalPages = Math.ceil(totalProducts / limit);
+
+    // 7. Send Response
+    res.status(200).json({
+      success: true,
+      message: "Products fetched successfully",
+      meta: {
+        totalProducts,
+        totalPages,
+        currentPage: page,
+        productsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+        // Optional: Active filters return করলে ফ্রন্টএন্ডে ডিবাগ করা সহজ হয়
+        activeFilters: { keyword, category, brand, minPrice, maxPrice, sort }
+      },
+      data: products
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};

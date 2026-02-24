@@ -6,7 +6,8 @@ const {
   getProductBySlug, 
   updateProduct, 
   deleteProduct,
-  getRelatedProducts
+  getRelatedProducts,
+  searchAndFilterProducts
 } = require("../controller/productController");
 
 // Middlewares
@@ -18,6 +19,7 @@ const { verifyToken, checkPermission } = require("../middlewares/authMiddleware"
 // PUBLIC ROUTES (Storefront)
 // ==================================================================
 // প্রোডাক্ট দেখা সবার জন্য উন্মুক্ত
+router.get("/search", searchAndFilterProducts);
 router.get("/", getAllProducts); 
 router.get("/related/:id", getRelatedProducts); 
 router.get("/:slug", getProductBySlug); 
