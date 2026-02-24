@@ -17,11 +17,13 @@ const { createCoupon, getAllCoupons, updateCoupon, deleteCoupon, applyCoupon } =
 const { createSlide, getAllSlides, updateSlide, deleteSlide } = require("../controller/heroSliderController");
 
 
-
-// Public routes
+// ===========================================
+// 🌍 PUBLIC ROUTES (Frontend Users)
+// ===========================================
 router.get("/sliders", getAllSlides);
-// Public Route (Checkout)
 router.post("/coupons/apply", applyCoupon);
+
+router.get("/landing/public/:slug", getLandingPagePublic); 
 
 
 
@@ -35,10 +37,6 @@ router.get("/logs", checkPermission("sms.view"), getSmsLogs);
 router.get("/logs/export", checkPermission("sms.view"), exportSmsLogs);
 
 
-// ===========================================
-// 🌍 PUBLIC ROUTES (Frontend Users)
-// ===========================================
-router.get("/landing/public/:slug", getLandingPagePublic); 
 
 
 // ===========================================

@@ -745,3 +745,88 @@ exports.createPosOrder = async (req, res, next) => {
         next(error);
     }
 };
+
+
+
+// ==========================================
+// 12. ADMIN: Delete Order
+// ==========================================
+exports.deleteOrder = async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+        return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    // 🔥 MAIN LOGIC: Prevent deletion if paid & delivered
+    if (order.paymentStatus === 'paid' && order.status === 'delivered') {
+        return res.status(403).json({ 
+            success: false, 
+            message: "Action Denied! Paid and Delivered orders cannot be deleted for accounting and record-keeping purposes." 
+        });
+    }
+
+    // যদি ক্যানসেলড বা পেন্ডিং থাকে, তাহলেই শুধু ডিলিট হবে
+    await Order.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+        success: true,
+        message: "Order deleted successfully"
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==========================================
+// 13. ADMIN: Convert Failed/Pending Payment to COD
+// ==========================================
+exports.convertPaymentToCod = async (req, res, next) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) throw createError(404, "Order not found");
+
+        // 🔥 Security Check: If already paid or delivered, stop conversion
+        if (order.paymentStatus === 'paid' || order.status === 'delivered') {
+            return res.status(403).json({ 
+                success: false, 
+                message: "Action Denied! Paid or Delivered orders cannot be modified." 
+            });
+        }
+
+        // 🔥 Forceful Atomic Update using $set
+        const updatedOrder = await Order.findByIdAndUpdate(
+            req.params.id,
+            {
+                $set: {
+                    paymentMethod: "cod",      // Fully reset to COD
+                    paymentStatus: "pending"   // Reset payment status
+                },
+                $push: {
+                    "management.logs": {
+                        action: "Converted to COD",
+                        note: "Admin manually converted digital payment to COD after phone confirmation.",
+                        admin: req.user._id,
+                        date: new Date()
+                    },
+                    timeline: {
+                        status: order.status,
+                        updatedBy: req.user._id,
+                        date: new Date(),
+                        note: "Payment method changed to Cash on Delivery (COD)"
+                    }
+                }
+            },
+            { new: true } // রিটার্নে আপডেট হওয়া ডাটা পাঠাবে
+        );
+
+        res.status(200).json({ 
+            success: true, 
+            message: "Order successfully converted to COD!", 
+            data: updatedOrder 
+        });
+    } catch (error) { 
+        next(error); 
+    }
+};

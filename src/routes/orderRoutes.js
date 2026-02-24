@@ -5,7 +5,9 @@ const {
     getAllOrdersAdmin, updateOrderStatus, assignOrder, addOrderLog, settleCourierPayments,
     updateOrderStatusBulk, updateCRMStatus, 
     updateOrderDetailsFull,
-    createPosOrder
+    createPosOrder,
+    deleteOrder,
+    convertPaymentToCod
 } = require("../controller/orderController");
 
 const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
@@ -76,5 +78,12 @@ router.post(
 // ==================================================================
 router.get("/my-orders", verifyToken, myOrders);
 router.get("/:id", verifyToken, getSingleOrder);
+
+
+// 10. Delete Order (Needs 'order.delete' permission)
+router.delete("/admin/delete/:id", verifyToken, checkPermission("order.delete"), deleteOrder);
+
+// 11. Convert to COD (Needs 'order.edit' permission)
+router.put("/admin/convert-cod/:id", verifyToken, checkPermission("order.edit"), convertPaymentToCod);
 
 module.exports = router;
