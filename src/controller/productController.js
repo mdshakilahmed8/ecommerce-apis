@@ -109,16 +109,23 @@ exports.getAllProducts = async (req, res, next) => {
     // ১. কুয়েরি প্যারামিটার রিসিভ করা (Default: Page 1, Limit 10)
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const { keyword, category, brand, priceMin, priceMax, sort } = req.query;
+    
+    // 🔥 চেঞ্জ ১: req.query থেকে isFeatured রিসিভ করা হলো
+    const { keyword, category, brand, priceMin, priceMax, sort, isFeatured } = req.query;
 
     // ২. ফিল্টারিং অবজেক্ট তৈরি
-    let query = { isPublished: true }; // ডিফল্টভাবে শুধু পাবলিশড প্রোডাক্ট দেখাবে
+    let query = { isPublished: true }; 
+    
+    // 🔥 চেঞ্জ ২: যদি API-তে isFeatured=true পাঠানো হয়, তাহলে কুয়েরিতে সেটা অ্যাড হবে
+    if (isFeatured === 'true') {
+        query.isFeatured = true;
+    }
 
     // A. সার্চ (টাইটেল, ট্যাগস বা শর্ট ডেসক্রিপশন দিয়ে)
     if (keyword) {
         query.$or = [
             { title: { $regex: keyword, $options: "i" } },
-            { shortDescription: { $regex: keyword, $options: "i" } }, // shortDescription এও খুঁজবে
+            { shortDescription: { $regex: keyword, $options: "i" } }, 
             { tags: { $in: [new RegExp(keyword, "i")] } }
         ];
     }
@@ -149,9 +156,9 @@ exports.getAllProducts = async (req, res, next) => {
 
     // ৫. ডাটাবেস কুয়েরি
     const products = await Product.find(query)
-        .populate("category", "name slug") // ক্যাটাগরির নাম ও স্লাগ
-        .populate("brand", "name slug logo") // ব্র্যান্ডের ডিটেইলস
-        .select("-description") // লিস্ট ভিউতে বিশাল description দরকার নেই, লোড কমবে
+        .populate("category", "name slug") 
+        .populate("brand", "name slug logo") 
+        .select("-description") 
         .sort(sortOption)
         .skip(skip)
         .limit(limit);
@@ -179,7 +186,6 @@ exports.getAllProducts = async (req, res, next) => {
     next(error);
   }
 };
-
 // 3. Get Single Product (By Slug)
 exports.getProductBySlug = async (req, res, next) => {
   try {

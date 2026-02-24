@@ -41,6 +41,7 @@ const productSchema = new mongoose.Schema({
 
   tags: [String],
   isPublished: { type: Boolean, default: true },
+  isFeatured: { type: Boolean, default: false },
   
   // Analytics
   sold: { type: Number, default: 0 },
