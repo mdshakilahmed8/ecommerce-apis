@@ -77,7 +77,7 @@ router.post(
 // 👤 USER ROUTES
 // ==================================================================
 router.get("/my-orders", verifyToken, myOrders);
-router.get("/:id", verifyToken, getSingleOrder);
+router.get("/:id", optionalVerifyToken, getSingleOrder);
 
 
 // 10. Delete Order (Needs 'order.delete' permission)

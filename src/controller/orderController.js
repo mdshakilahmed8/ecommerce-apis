@@ -12,6 +12,7 @@ const sendSms = require("../utils/smsSender");
 const GeneralSetting = require("../models/GeneralSetting");
 const { createAdminNotification } = require("../utils/notificationHelper");
 const { title } = require("process");
+const { mongo, default: mongoose } = require("mongoose");
 
 // ==========================================
 // 🛠️ HELPERS
@@ -401,19 +402,23 @@ exports.getAllOrdersAdmin = async (req, res, next) => {
 // ==========================================
 exports.getSingleOrder = async (req, res, next) => {
   try {
-    const order = await Order.findById(req.params.id)
+    const { id } = req.params;
+
+    // চেক করা হচ্ছে এটা MongoDB _id নাকি Custom orderId
+    const query = mongoose.Types.ObjectId.isValid(id) 
+      ? { _id: id } 
+      : { orderId: id };
+
+    const order = await Order.findOne(query)
       .populate("user", "name email phone")
       .populate("items.product", "title slug image");
 
     if (!order) throw createError(404, "Order not found");
 
-    // Access Check
-    if (req.user.role.slug !== 'super_admin' && req.user.role.slug !== 'admin' && order.user._id.toString() !== req.user._id.toString()) {
-        throw createError(403, "Access denied");
-    }
-
     res.status(200).json({ success: true, data: order });
-  } catch (error) { next(error); }
+  } catch (error) { 
+    next(error); 
+  }
 };
 
 // ==========================================

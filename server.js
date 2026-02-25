@@ -26,7 +26,7 @@ const server = http.createServer(app); // 🔥 ৩. এক্সপ্রেস 
 // 🔥 ৪. Socket.io ইনিশিয়েলাইজেশন
 const io = new Server(server, {
   cors: {
-    origin: [process.env.FRONTEND_URL],
+    origin: [process.env.FRONTEND_URL, 'https://unsaintly-dizzying-kattie.ngrok-free.dev'],
     credentials: true,
   },
 });
@@ -51,7 +51,7 @@ const bootstrapApp = async () => {
     app.use(helmet({ contentSecurityPolicy: false }));
     app.use(
       cors({
-        origin: [process.env.FRONTEND_URL],
+        origin: [process.env.FRONTEND_URL, 'https://unsaintly-dizzying-kattie.ngrok-free.dev',],
         credentials: true,
       })
     );
