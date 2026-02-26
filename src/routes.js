@@ -26,6 +26,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const globalRoutes = require("./routes/globalRoutes");
 const userRoutes = require('./routes/userRoutes')
 const trackingRoutes = require('./routes/trackingRoutes')
+const storeLicenseRoutes = require("./routes/storeLicenseRoutes");
 
 router.use("/auth",authRouter);
 router.use("/roles", roleRoutes);
@@ -54,6 +55,8 @@ router.use("/reports", reportRoutes);
 router.use("/global", globalRoutes);
 router.use('/user', userRoutes)
 router.use('/tracking', trackingRoutes)
+
+router.use("/settings", storeLicenseRoutes);
 
 
 module.exports = router;
