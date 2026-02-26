@@ -3,9 +3,12 @@
 const User = require("../models/User");
 const Otp = require("../models/Otp");
 const Role = require("../models/Role");
+const SmsTemplate = require("../models/SmsTemplate"); // 🔥 Added for dynamic SMS
 const createError = require("http-errors");
 const jwt = require("jsonwebtoken");
 const { secretKey, accessTokenExpiration, refreshTokenExpiration } = require("../secret");
+const sendSms = require("../utils/smsSender"); // 🔥 Import your dynamic SMS Sender
+const GeneralSetting = require("../models/GeneralSetting"); // 🔥 Needed for storeName in SMS
 
 // --- 1. REGISTER USER ---
 exports.registerUser = async (req, res, next) => {
@@ -47,6 +50,20 @@ exports.registerUser = async (req, res, next) => {
     
     await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
     await Otp.create({ phone: { countryCode, number: phoneNumber }, otp: otpCode });
+
+    // 🔥 DYNAMIC SMS LOGIC FOR REGISTRATION OTP
+    const fullPhone = `${countryCode.replace('+', '')}${phoneNumber}`;
+    const templates = await SmsTemplate.findOne();
+
+    if (templates && templates.otpVerification && templates.otpVerification.isActive) {
+        let msg = templates.otpVerification.message;
+        msg = msg.replace(/{otp}/g, otpCode);
+        msg = msg.replace(/{expire_time}/g, "5"); // OTP is valid for 5 mins as per your logic
+        await sendSms(fullPhone, msg);
+    } else {
+        // Fallback message if templates are missing
+        await sendSms(fullPhone, `Your verification OTP is ${otpCode}. It expires in 5 minutes.`);
+    }
 
     console.log(`>>> OTP sent to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
 
@@ -93,31 +110,49 @@ exports.verifyOtp = async (req, res, next) => {
 
     if (!user) throw createError(404, "User not found.");
 
+    // Check if it's the first time verification (New Account Created)
+    const isFirstTimeVerification = !user.isPhoneVerified;
+
     user.isPhoneVerified = true;
     user.status = "active";
     await user.save();
     
     await Otp.deleteMany({ "phone.countryCode": countryCode, "phone.number": phoneNumber });
 
+    // 🔥 DYNAMIC SMS LOGIC: WELCOME MESSAGE (Only sent once after first verification)
+    if (isFirstTimeVerification) {
+        const fullPhone = `${countryCode.replace('+', '')}${phoneNumber}`;
+        const templates = await SmsTemplate.findOne();
+        const settings = await GeneralSetting.findOne();
+        const storeName = settings?.storeName || "Our Shop";
+
+        if (templates && templates.accountCreated && templates.accountCreated.isActive) {
+            let msg = templates.accountCreated.message;
+            msg = msg.replace(/{customer_name}/g, user.name || 'Customer');
+            msg = msg.replace(/{store_name}/g, storeName);
+            
+            // Fire and forget (don't block the response)
+            sendSms(fullPhone, msg).catch(err => console.error("Welcome SMS Failed:", err.message));
+        }
+    }
+
     const payload = { _id: user._id, role: user.role }; 
     
     const accessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration });
     const refreshToken = jwt.sign(payload, secretKey, { expiresIn: refreshTokenExpiration });
 
-    // Set Refresh Token Cookie
     res.cookie("refreshToken", refreshToken, {
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
       httpOnly: true, 
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path: "/"
     });
 
-    // Access Token Cookie
     res.cookie("accessToken", accessToken, {
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 15 * 60 * 1000, 
       httpOnly: true, 
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path: "/"
     });
@@ -180,17 +215,17 @@ exports.loginUser = async (req, res, next) => {
     const refreshToken = jwt.sign(payload, secretKey, { expiresIn: refreshTokenExpiration });
 
     res.cookie("refreshToken", refreshToken, {
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
       httpOnly: true,
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path:"/"
     });
 
     res.cookie("accessToken", accessToken, {
-      maxAge: 15 * 60 * 1000, // 15 mins
+      maxAge: 15 * 60 * 1000, 
       httpOnly: true,
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path:"/"
     });
@@ -221,14 +256,14 @@ exports.logoutUser = async (req, res, next) => {
   try {
     res.clearCookie("accessToken", {
       httpOnly: true,
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path: "/" 
     });
 
     res.clearCookie("refreshToken", {
       httpOnly: true,
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path: "/" 
     });
@@ -263,6 +298,19 @@ exports.resendOtp = async (req, res, next) => {
           otp: otpCode 
       });
 
+      // 🔥 DYNAMIC SMS LOGIC FOR RESEND OTP
+      const fullPhone = `${countryCode.replace('+', '')}${phoneNumber}`;
+      const templates = await SmsTemplate.findOne();
+
+      if (templates && templates.otpVerification && templates.otpVerification.isActive) {
+          let msg = templates.otpVerification.message;
+          msg = msg.replace(/{otp}/g, otpCode);
+          msg = msg.replace(/{expire_time}/g, "5");
+          await sendSms(fullPhone, msg);
+      } else {
+          await sendSms(fullPhone, `Your verification OTP is ${otpCode}. It expires in 5 minutes.`);
+      }
+
       console.log(`>>> Resend OTP to ${countryCode}${phoneNumber}: ${otpCode} <<<`);
 
       res.status(200).json({
@@ -275,7 +323,7 @@ exports.resendOtp = async (req, res, next) => {
   }
 };
 
-// --- 6. REFRESH TOKEN (WEB & MOBILE SAFE) ---
+// --- 6. REFRESH TOKEN ---
 exports.refreshToken = async (req, res, next) => {
   try {
     let token = req.cookies?.refreshToken;
@@ -298,9 +346,9 @@ exports.refreshToken = async (req, res, next) => {
     const newAccessToken = jwt.sign(payload, secretKey, { expiresIn: accessTokenExpiration }); 
 
     res.cookie("accessToken", newAccessToken, {
-      maxAge: 15 * 60 * 1000, // 15 mins
+      maxAge: 15 * 60 * 1000, 
       httpOnly: true,
-      secure: false, // NODE_ENV রিমুভ করা হয়েছে
+      secure: false, 
       sameSite: "strict",
       path: "/"
     });

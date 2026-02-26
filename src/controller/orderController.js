@@ -5,6 +5,7 @@ const User = require("../models/User");
 const Role = require("../models/Role");
 const Otp = require("../models/Otp");
 const PaymentSetting = require("../models/PaymentSetting"); 
+const SmsTemplate = require("../models/SmsTemplate");
 const createError = require("http-errors");
 const crypto = require("crypto");
 const { initiatePayment } = require("./paymentController"); 
@@ -30,12 +31,6 @@ const generateOrderId = () => {
 const generateRandomPassword = () => crypto.randomBytes(4).toString('hex');
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString(); // 6 Digit
 
-// // SMS Sender (Placeholder)
-// const sendSms = async (to, message) => {
-//     console.log(`📨 [SMS to ${to}]: ${message}`);
-//     // await axios.post(...) 
-// };
-
 
 // ==================================================================
 // ⚙️ INTERNAL SHARED FUNCTION: PLACE ORDER
@@ -43,11 +38,11 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms: true }) => {
     const { items, shippingAddress, paymentMethod, shippingFee, discount, guestId, subTotal, grandTotal } = orderData;
 
-    // ১. ব্র্যান্ডিং-এর জন্য স্টোর নেম নিয়ে আসা
+    // ১. ব্র্যান্ডিং-এর জন্য স্টোর নেম নিয়ে আসা
     const settings = await GeneralSetting.findOne();
     const storeName = settings?.storeName || "Our Shop"; // ডিফল্ট নাম যদি সেটিং না থাকে
 
-    // ২. পেমেন্ট মেথড লোয়ারকেস করা
+    // ২. পেমেন্ট মেথড লোয়ারকেস করা
     const pMethod = paymentMethod.toLowerCase();
 
     // ৩. আইটেম এবং স্টক ক্যালকুলেশন
@@ -61,7 +56,7 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
         let finalPrice = 0, finalName = dbProduct.title, finalSku = "GEN-SKU";
         let finalImage = dbProduct.images[0] || "";
 
-        // ভেরিয়েন্ট চেক
+        // ভেরিয়েন্ট চেক
         if (item.variantId) {
             const variant = dbProduct.variants.find(v => v._id.toString() === item.variantId);
             if (!variant) throw createError(400, `Variant not found for: ${dbProduct.title}`);
@@ -77,8 +72,6 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
             // প্রাইস এবং ইমেজ সেট করা
             finalPrice = variant.price;
             if (variant.image) finalImage = variant.image;
-            // ভেরিয়েন্ট অ্যাট্রিবিউট টাইটেলের সাথে যুক্ত করা (অপশনাল, রিপোর্টিংয়ের জন্য ভালো)
-            // finalName = `${dbProduct.title} - ${Object.values(variant.attributes).join('/')}`;
 
         } else {
             // সিম্পল প্রোডাক্ট চেক
@@ -94,7 +87,7 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
             finalPrice = dbProduct.discountPrice || dbProduct.price;
         }
 
-        // সেলস কাউন্ট বাড়ানো
+        // সেলস কাউন্ট বাড়ানো
         dbProduct.sold += item.quantity;
         await dbProduct.save();
 
@@ -113,13 +106,9 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
         calculatedSubTotal += (finalPrice * item.quantity);
     }
 
-    // ৪. ফাইনান্সিয়াল ক্যালকুলেশন (Backend Validation)
-    // ক্লায়েন্ট সাইড থেকে পাঠানো ভ্যালু রি-ভেরিফাই করা ভালো, তবে এখানে আমরা পাঠানো ডাটাই ব্যবহার করছি
+    // ৪. ফাইনান্সিয়াল ক্যালকুলেশন
     const finalShippingFee = Number(shippingFee) || 0;
     const finalDiscount = Number(discount) || 0;
-    
-    // গ্র্যান্ড টোটাল আবার ক্যালকুলেট করা হচ্ছে যাতে ফ্রন্টএন্ডে কেউ ম্যানিপুলেট না করে
-    // (আপনি চাইলে ফ্রন্টএন্ডের grandTotal-ও রাখতে পারেন, তবে ব্যাকএন্ড ক্যালকুলেশন নিরাপদ)
     const calculatedGrandTotal = (calculatedSubTotal + finalShippingFee) - finalDiscount;
 
     // ৫. ইউনিক অর্ডার আইডি জেনারেট
@@ -140,14 +129,13 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
             }
         },
         paymentMethod: pMethod,
-        paymentStatus: orderData.paymentStatus || "pending", // POS হলে 'paid' আসবে
+        paymentStatus: orderData.paymentStatus || "pending", 
         subTotal: calculatedSubTotal,
         shippingFee: finalShippingFee,
         discount: finalDiscount,
         grandTotal: calculatedGrandTotal,
-        status: orderData.status || "pending", // POS হলে 'delivered' আসবে
+        status: orderData.status || "pending", 
         
-        // লগ এবং টাইমলাইন
         management: { 
             status: "new", 
             logs: [{ action: "Order Placed", date: new Date() }] 
@@ -160,42 +148,43 @@ const placeOrderInternal = async (orderData, user, ip, options = { sendOrderSms:
         }]
     });
 
-    // ডাটাবেসে সেভ করা
     await order.save();
 
-    // ৭. পেমেন্ট গেটওয়ে এবং SMS লজিক
+    // ৭. পেমেন্ট গেটওয়ে এবং SMS লজিক
     let paymentUrl = null;
     const digitalMethods = ["sslcommerz", "bkash", "nagad"];
 
     if (digitalMethods.includes(pMethod)) {
         try {
-            // পেমেন্ট লিংক জেনারেট করা
             paymentUrl = await initiatePayment(order);
         } catch (error) {
             console.error("🔴 Gateway Error:", error.message);
-            // পেমেন্ট ইনিশিয়েট না হলে অর্ডার ডিলিট করা হচ্ছে (রোলব্যাক)
             await Order.findByIdAndDelete(order._id);
             throw createError(500, "Payment Gateway Initialization Failed");
         }
     } else {
-        // COD বা POS পেমেন্ট
-        // 🔥 SMS পাঠানো হবে কিনা তা 'options.sendOrderSms' দিয়ে চেক করা হচ্ছে
+        // 🔥 Dynamic SMS Logic for COD/POS
         if (options.sendOrderSms) {
             try {
                 const fullPhone = `${shippingAddress.phone.countryCode?.replace('+', '')}${shippingAddress.phone.number}`;
+                const templates = await SmsTemplate.findOne();
                 
-                // ✅ DYNAMIC BRANDING MESSAGE
-                const message = `Dear Customer, Your order #${orderId} has been placed at ${storeName}. Total: ${calculatedGrandTotal} Tk. Thank you!`;
-                
-                await sendSms(fullPhone, message);
+                if (templates && templates.orderPlaced && templates.orderPlaced.isActive) {
+                    let message = templates.orderPlaced.message;
+                    // Replace dynamic variables
+                    message = message.replace(/{customer_name}/g, shippingAddress.fullName || 'Customer');
+                    message = message.replace(/{order_id}/g, orderId);
+                    message = message.replace(/{total_amount}/g, calculatedGrandTotal);
+                    
+                    await sendSms(fullPhone, message);
+                }
             } catch (smsError) {
                 console.error("SMS Failed:", smsError.message);
-                // SMS ফেইল হলে অর্ডার আটকাবো না
             }
         }
     }
 
-    // ৮. গেস্ট বা অ্যাবান্ডনড চেকআউট ক্লিয়ার করা
+    // ৮. গেস্ট বা অ্যাবান্ডনড চেকআউট ক্লিয়ার করা
     if (guestId) {
         await AbandonedCheckout.findOneAndDelete({ guestId });
     }
@@ -213,14 +202,10 @@ exports.initiateOrder = async (req, res, next) => {
         
         if (!shippingAddress?.phone?.number) throw createError(400, "Phone number required");
 
-        // 🔥 1. Clean Input (Convert to lowercase)
         const cleanMethod = paymentMethod.toLowerCase();
 
-        // 🔥 2. Check if Payment Method is Active (Skip for COD)
         if (cleanMethod !== 'cod') {
             const setting = await PaymentSetting.findOne({ provider: cleanMethod });
-            
-            // If setting not found or isActive is false
             if (!setting || setting.isActive === false) {
                  throw createError(400, `Payment method '${paymentMethod}' is currently disabled.`);
             }
@@ -230,11 +215,10 @@ exports.initiateOrder = async (req, res, next) => {
         const countryCode = shippingAddress.phone.countryCode || "880";
         let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
         
-        // 3. Check User
         let user = req.user ? await User.findById(req.user._id) : await User.findOne({ "phone.number": userPhone });
 
         // ---------------------------------------------
-        // SCENARIO A: EXISTING USER (Direct Order)
+        // SCENARIO A: EXISTING USER
         // ---------------------------------------------
         if (user) {
             const result = await placeOrderInternal(req.body, user, ip);
@@ -252,11 +236,12 @@ exports.initiateOrder = async (req, res, next) => {
         // ---------------------------------------------
         else {
             const digitalMethods = ["sslcommerz", "bkash", "nagad"];
+            const settings = await GeneralSetting.findOne();
+            const storeName = settings?.storeName || "Our Store";
+            const templates = await SmsTemplate.findOne();
 
-            // 🔥 CASE 1: DIGITAL PAYMENT (No OTP Needed)
+            // 🔥 CASE 1: DIGITAL PAYMENT
             if (digitalMethods.includes(cleanMethod)) {
-                
-                // Auto Create User
                 const customerRole = await Role.findOne({ slug: "customer" });
                 if (!customerRole) throw createError(500, "Customer Role missing");
 
@@ -268,13 +253,20 @@ exports.initiateOrder = async (req, res, next) => {
                     email: shippingAddress.email,
                     password: generatedPass,
                     role: customerRole._id,
-                    isPhoneVerified: false, // Will be verified after payment
+                    isPhoneVerified: false, 
                     status: "active"
                 });
 
-                await sendSms(userPhone, `Account Created. Login Pass: ${generatedPass}`);
+                // 🔥 Dynamic SMS: Auto Account Created
+                if (templates && templates.autoAccountCreated && templates.autoAccountCreated.isActive) {
+                    let msg = templates.autoAccountCreated.message;
+                    msg = msg.replace(/{customer_name}/g, newUser.name);
+                    msg = msg.replace(/{store_name}/g, storeName);
+                    msg = msg.replace(/{phone}/g, userPhone);
+                    msg = msg.replace(/{password}/g, generatedPass);
+                    await sendSms(userPhone, msg);
+                }
 
-                // Place Order Directly
                 const result = await placeOrderInternal(req.body, newUser, ip);
 
                 return res.status(201).json({
@@ -291,16 +283,23 @@ exports.initiateOrder = async (req, res, next) => {
             else {
                 const otp = generateOTP();
                 
-                // Clean old OTPs
                 await Otp.deleteMany({ "phone.number": userPhone, "phone.countryCode": countryCode });
                 
-                // Save new OTP
                 await Otp.create({ 
                     phone: { countryCode, number: userPhone }, 
                     otp 
                 });
 
-                await sendSms(userPhone, `Verification Code: ${otp}`);
+                // 🔥 Dynamic SMS: OTP Verification
+                if (templates && templates.otpVerification && templates.otpVerification.isActive) {
+                    let msg = templates.otpVerification.message;
+                    msg = msg.replace(/{otp}/g, otp);
+                    msg = msg.replace(/{expire_time}/g, "10"); // Configurable if needed
+                    await sendSms(userPhone, msg);
+                } else {
+                    // Fallback if template missing
+                    await sendSms(userPhone, `Verification Code: ${otp}`);
+                }
 
                 return res.status(200).json({
                     success: true,
@@ -323,14 +322,12 @@ exports.verifyOrderOTP = async (req, res, next) => {
         const userPhone = shippingAddress.phone.number;
         const countryCode = shippingAddress.phone.countryCode || "880";
 
-        // 1. Verify OTP
         const otpRecord = await Otp.findOne({ 
             "phone.number": userPhone, "phone.countryCode": countryCode, otp 
         });
 
         if (!otpRecord) throw createError(400, "Invalid OTP");
 
-        // 2. Create User
         const customerRole = await Role.findOne({ slug: "customer" });
         const generatedPass = generateRandomPassword();
 
@@ -344,12 +341,21 @@ exports.verifyOrderOTP = async (req, res, next) => {
             status: "active"
         });
 
-        await sendSms(userPhone, `Account Created. Pass: ${generatedPass}`);
+        // 🔥 Dynamic SMS: Auto Account Created
+        const settings = await GeneralSetting.findOne();
+        const templates = await SmsTemplate.findOne();
         
-        // 3. Delete OTP
+        if (templates && templates.autoAccountCreated && templates.autoAccountCreated.isActive) {
+            let msg = templates.autoAccountCreated.message;
+            msg = msg.replace(/{customer_name}/g, newUser.name);
+            msg = msg.replace(/{store_name}/g, settings?.storeName || "Our Shop");
+            msg = msg.replace(/{phone}/g, userPhone);
+            msg = msg.replace(/{password}/g, generatedPass);
+            await sendSms(userPhone, msg);
+        }
+        
         await Otp.deleteMany({ "phone.number": userPhone, "phone.countryCode": countryCode });
 
-        // 4. Place Order (COD)
         let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
         const fullOrderBody = { shippingAddress, ...orderData };
         
@@ -404,7 +410,6 @@ exports.getSingleOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // চেক করা হচ্ছে এটা MongoDB _id নাকি Custom orderId
     const query = mongoose.Types.ObjectId.isValid(id) 
       ? { _id: id } 
       : { orderId: id };
@@ -427,23 +432,41 @@ exports.getSingleOrder = async (req, res, next) => {
 exports.assignOrder = async (req, res, next) => {
     try {
         const { orderId } = req.params;
-        const adminId = req.user._id;
-        const order = await Order.findById(orderId);
+        const { assignedTo } = req.body; 
+
+        const updateData = assignedTo ? assignedTo : null;
+
+        const order = await Order.findByIdAndUpdate(
+            orderId,
+            { 
+                $set: { "management.assignedTo": updateData }, 
+                $push: { 
+                    "management.logs": { 
+                        action: assignedTo ? "Assigned to staff" : "Unassigned", 
+                        admin: req.user._id,
+                        date: new Date()
+                    } 
+                }
+            },
+            { new: true }
+        ).populate("management.assignedTo", "name email"); 
+
         if (!order) throw createError(404, "Order not found");
-        
-        order.management.assignedTo = adminId;
-        order.management.status = "processing";
-        order.management.logs.push({ action: "Assigned", note: "Admin took responsibility", admin: adminId });
-        await order.save();
-        res.status(200).json({ success: true, message: "Assigned to you", data: order });
-    } catch (error) { next(error); }
+
+        res.status(200).json({ 
+            success: true, 
+            message: assignedTo ? "Staff assigned successfully" : "Order unassigned",
+            data: order 
+        });
+
+    } catch (error) {
+        next(error);
+    }
 };
 
 // ==========================================
 // 7. ADMIN CRM: Add Note
 // ==========================================
-// src/controller/orderController.js
-
 exports.addOrderLog = async (req, res, next) => {
     try {
         const { orderId } = req.params;
@@ -499,19 +522,38 @@ exports.settleCourierPayments = async (req, res, next) => {
 };
 
 // ==========================================
-// 9. ADMIN: General Update
+// 9. ADMIN: General Update (Status & Courier)
 // ==========================================
 exports.updateOrderStatus = async (req, res, next) => {
   try {
     const { status, courier, note } = req.body;
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).populate('user');
     if (!order) throw createError(404, "Order not found");
-    if (status) {
+    
+    if (status && status !== order.status) {
         order.status = status;
-        if (status === "delivered") { order.deliveredAt = Date.now(); order.paymentStatus = "paid"; }
+        if (status === "delivered") { 
+            order.deliveredAt = Date.now(); 
+            order.paymentStatus = "paid"; 
+        }
+
+        // 🔥 Dynamic SMS: Status Changed
+        const templates = await SmsTemplate.findOne();
+        if (templates && templates.orderStatusChanged && templates.orderStatusChanged.isActive) {
+            const userPhone = order.shippingAddress?.phone?.number || order.user?.phone?.number;
+            if (userPhone) {
+                let msg = templates.orderStatusChanged.message;
+                msg = msg.replace(/{customer_name}/g, order.shippingAddress?.fullName || 'Customer');
+                msg = msg.replace(/{order_id}/g, order.orderId);
+                msg = msg.replace(/{order_status}/g, status.toUpperCase());
+                await sendSms(userPhone, msg);
+            }
+        }
     }
+    
     if (courier) { order.courier = { ...order.courier, ...courier }; }
     order.timeline.push({ status: status || order.status, updatedBy: req.user._id, date: Date.now(), note: note || `Status updated to ${status}` });
+    
     await order.save();
     res.status(200).json({ success: true, message: "Order updated", data: order });
   } catch (error) { next(error); }
@@ -557,73 +599,20 @@ exports.updateCRMStatus = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-// ✅ Assign Order to Staff (Fixed)
-exports.assignOrder = async (req, res, next) => {
-  try {
-    const { orderId } = req.params;
-    const { assignedTo } = req.body; // এটি হবে User ID (String)
-
-    // যদি assignedTo খালি থাকে, তার মানে Unassign করা হচ্ছে
-    const updateData = assignedTo ? assignedTo : null;
-
-    const order = await Order.findByIdAndUpdate(
-      orderId,
-      { 
-        $set: { "management.assignedTo": updateData }, // 🔥 Nested Field Update
-        $push: { 
-          "management.logs": { 
-            action: assignedTo ? "Assigned to staff" : "Unassigned", 
-            admin: req.user._id,
-            date: new Date()
-          } 
-        }
-      },
-      { new: true }
-    ).populate("management.assignedTo", "name email"); // Populate করে রেসপন্স পাঠাচ্ছি
-
-    if (!order) throw createError(404, "Order not found");
-
-    res.status(200).json({ 
-      success: true, 
-      message: assignedTo ? "Staff assigned successfully" : "Order unassigned",
-      data: order 
-    });
-
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-
-
 // ==========================================
 // 11. ADMIN: Update Full Order Details (Items, Address, Price)
 // ==========================================
 exports.updateOrderDetailsFull = async (req, res, next) => {
     try {
         const { id } = req.params;
-        // Frontend থেকে আসা ডাটাগুলো destructure করছি
-        const { 
-            items, 
-            shippingAddress, 
-            subTotal, 
-            shippingFee, 
-            discount, 
-            grandTotal 
-        } = req.body;
+        const { items, shippingAddress, subTotal, shippingFee, discount, grandTotal } = req.body;
 
         const order = await Order.findById(id);
         if (!order) throw createError(404, "Order not found");
 
-        // ১. আইটেম আপডেট (যদি থাকে)
-        if (items && Array.isArray(items)) {
-            order.items = items;
-        }
-
-        // ২. শিপিং অ্যাড্রেস আপডেট (যদি থাকে)
+        if (items && Array.isArray(items)) order.items = items;
+        
         if (shippingAddress) {
-            // আগের ডাটার সাথে নতুন ডাটা মার্জ করা হচ্ছে যাতে কিছু মিস না হয়
             order.shippingAddress = {
                 ...order.shippingAddress,
                 ...shippingAddress,
@@ -634,21 +623,18 @@ exports.updateOrderDetailsFull = async (req, res, next) => {
             };
         }
 
-        // ৩. টাকার হিসাব আপডেট (Financials)
         if (subTotal !== undefined) order.subTotal = Number(subTotal);
         if (shippingFee !== undefined) order.shippingFee = Number(shippingFee);
         if (discount !== undefined) order.discount = Number(discount);
         if (grandTotal !== undefined) order.grandTotal = Number(grandTotal);
 
-        // ৪. লগ অ্যাড করা (CRM Log)
         order.management.logs.push({
             action: "Order Details Edited",
             note: "Admin manually updated items, address or pricing.",
-            admin: req.user._id, // যে এডমিন এডিট করেছে তার ID
+            admin: req.user._id, 
             date: new Date()
         });
 
-        // ৫. সেভ করা
         await order.save();
 
         res.status(200).json({ 
@@ -656,17 +642,13 @@ exports.updateOrderDetailsFull = async (req, res, next) => {
             message: "Order details updated successfully", 
             data: order 
         });
-
     } catch (error) {
         next(error);
     }
 };
 
-
-
-
 // ==================================================================
-// 🎮 CONTROLLER: POS ORDER CREATE (NEW)
+// 🎮 CONTROLLER: POS ORDER CREATE
 // ==================================================================
 exports.createPosOrder = async (req, res, next) => {
     try {
@@ -677,16 +659,14 @@ exports.createPosOrder = async (req, res, next) => {
         const userPhone = shippingAddress.phone.number;
         const countryCode = shippingAddress.phone.countryCode || "880";
         
-        // Settings fetch
         const settings = await GeneralSetting.findOne();
         const storeName = settings?.storeName || "Our Shop";
+        const templates = await SmsTemplate.findOne();
 
-        // ১. ইউজার চেক করা
         let user = await User.findOne({ "phone.number": userPhone });
         let isNewUser = false;
         let generatedPass = "";
 
-        // ২. ইউজার না থাকলে নতুন অ্যাকাউন্ট খোলা
         if (!user) {
             const customerRole = await Role.findOne({ slug: "customer" });
             if (!customerRole) throw createError(500, "Customer Role configuration missing");
@@ -702,21 +682,23 @@ exports.createPosOrder = async (req, res, next) => {
                 isPhoneVerified: true,
                 status: "active"
             });
-            
             isNewUser = true;
         }
 
-        // ৩. নতুন ইউজার হলে SMS পাঠানো
-        if (isNewUser) {
+        // 🔥 Dynamic SMS for Auto Account Creation (POS)
+        if (isNewUser && templates && templates.autoAccountCreated && templates.autoAccountCreated.isActive) {
             try {
-                const loginMsg = `Welcome to ${storeName}! Account created. Login Pass: ${generatedPass}. Order online next time!`;
-                await sendSms(userPhone, loginMsg);
+                let msg = templates.autoAccountCreated.message;
+                msg = msg.replace(/{customer_name}/g, user.name);
+                msg = msg.replace(/{store_name}/g, storeName);
+                msg = msg.replace(/{phone}/g, userPhone);
+                msg = msg.replace(/{password}/g, generatedPass);
+                await sendSms(userPhone, msg);
             } catch (smsError) {
                 console.error("Welcome SMS Failed:", smsError.message);
             }
         }
 
-        // ৪. অর্ডার প্লেস করা
         let ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
 
         const orderData = {
@@ -730,7 +712,6 @@ exports.createPosOrder = async (req, res, next) => {
 
         const result = await placeOrderInternal(orderData, user, ip, { sendOrderSms: false });
 
-
         await createAdminNotification(
             "New POS Order", 
             `A new POS order (${result.order.orderId}) has been created.`, 
@@ -738,8 +719,6 @@ exports.createPosOrder = async (req, res, next) => {
             `/admin/orders/${result.order._id}`
         );
 
-        
-        // ৫. রেসপন্স (newUser বাদ দেওয়া হয়েছে)
         res.status(201).json({
             success: true,
             message: "POS Order created successfully",
@@ -751,8 +730,6 @@ exports.createPosOrder = async (req, res, next) => {
     }
 };
 
-
-
 // ==========================================
 // 12. ADMIN: Delete Order
 // ==========================================
@@ -763,25 +740,18 @@ exports.deleteOrder = async (req, res, next) => {
         return res.status(404).json({ success: false, message: "Order not found" });
     }
 
-    // 🔥 MAIN LOGIC: Prevent deletion if paid & delivered
     if (order.paymentStatus === 'paid' && order.status === 'delivered') {
         return res.status(403).json({ 
             success: false, 
-            message: "Action Denied! Paid and Delivered orders cannot be deleted for accounting and record-keeping purposes." 
+            message: "Action Denied! Paid and Delivered orders cannot be deleted." 
         });
     }
 
-    // যদি ক্যানসেলড বা পেন্ডিং থাকে, তাহলেই শুধু ডিলিট হবে
     await Order.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({
-        success: true,
-        message: "Order deleted successfully"
-    });
+    res.status(200).json({ success: true, message: "Order deleted successfully" });
 
-  } catch (error) {
-    next(error);
-  }
+  } catch (error) { next(error); }
 };
 
 // ==========================================
@@ -792,7 +762,6 @@ exports.convertPaymentToCod = async (req, res, next) => {
         const order = await Order.findById(req.params.id);
         if (!order) throw createError(404, "Order not found");
 
-        // 🔥 Security Check: If already paid or delivered, stop conversion
         if (order.paymentStatus === 'paid' || order.status === 'delivered') {
             return res.status(403).json({ 
                 success: false, 
@@ -800,18 +769,14 @@ exports.convertPaymentToCod = async (req, res, next) => {
             });
         }
 
-        // 🔥 Forceful Atomic Update using $set
         const updatedOrder = await Order.findByIdAndUpdate(
             req.params.id,
             {
-                $set: {
-                    paymentMethod: "cod",      // Fully reset to COD
-                    paymentStatus: "pending"   // Reset payment status
-                },
+                $set: { paymentMethod: "cod", paymentStatus: "pending" },
                 $push: {
                     "management.logs": {
                         action: "Converted to COD",
-                        note: "Admin manually converted digital payment to COD after phone confirmation.",
+                        note: "Admin manually converted digital payment to COD.",
                         admin: req.user._id,
                         date: new Date()
                     },
@@ -823,7 +788,7 @@ exports.convertPaymentToCod = async (req, res, next) => {
                     }
                 }
             },
-            { new: true } // রিটার্নে আপডেট হওয়া ডাটা পাঠাবে
+            { new: true } 
         );
 
         res.status(200).json({ 
