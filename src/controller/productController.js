@@ -224,13 +224,14 @@ exports.updateProduct = async (req, res, next) => {
         newImages = [...newImages, ...uploadedUrls]; 
     }
 
-    // JSON Parsing
+    // JSON Parsing (Safety Added)
     let parsedVariants = product.variants;
-    if (req.body.variants) {
+    if (req.body.variants !== undefined) {
         parsedVariants = typeof req.body.variants === 'string' ? JSON.parse(req.body.variants) : req.body.variants;
     }
+    
     let parsedTags = product.tags;
-    if (req.body.tags) {
+    if (req.body.tags !== undefined) {
         parsedTags = typeof req.body.tags === 'string' ? JSON.parse(req.body.tags) : req.body.tags;
     }
 
@@ -240,22 +241,25 @@ exports.updateProduct = async (req, res, next) => {
         images: newImages,
         variants: parsedVariants,
         tags: parsedTags,
-        price: req.body.price ? Number(req.body.price) : product.price,
-        hasVariants: req.body.hasVariants === "true" || req.body.hasVariants === true
+        // 🔥 FIX: Check if price exists in request body
+        price: req.body.price !== undefined ? Number(req.body.price) : product.price,
+        // 🔥 FIX: Keep old hasVariants if not provided
+        hasVariants: req.body.hasVariants !== undefined 
+            ? (req.body.hasVariants === "true" || req.body.hasVariants === true)
+            : product.hasVariants
     };
     
     // --- SLUG UPDATE LOGIC ---
-    
-    // ১. যদি ইউজার স্পেসিফিক স্ল্যাগ দেয়
+    // ১. যদি ইউজার স্পেসিফিক স্ল্যাগ দেয়
     if (req.body.slug && req.body.slug.trim() !== "" && req.body.slug !== "null") {
         const newSlug = slugify(req.body.slug, { lower: true, strict: true });
-        // অন্য প্রোডাক্টের সাথে কনফ্লিক্ট চেক (নিজেকে বাদ দিয়ে)
+        // অন্য প্রোডাক্টের সাথে কনফ্লিক্ট চেক (নিজেকে বাদ দিয়ে)
         const slugExist = await Product.findOne({ slug: newSlug, _id: { $ne: product._id } });
         if (slugExist) throw createError(409, "Slug already exists. Try another.");
         
         updateData.slug = newSlug;
     }
-    // ২. যদি স্ল্যাগ না দেয়, কিন্তু টাইটেল পাল্টায় -> অটো স্ল্যাগ জেনারেট
+    // ২. যদি স্ল্যাগ না দেয়, কিন্তু টাইটেল পাল্টায় -> অটো স্ল্যাগ জেনারেট
     else if (req.body.title && req.body.title !== product.title) {
         let tempSlug = slugify(req.body.title, { lower: true, strict: true });
         // ইউনিকনেস চেক
@@ -278,7 +282,6 @@ exports.updateProduct = async (req, res, next) => {
     next(error);
   }
 };
-
 
 // 5. Delete Product
 exports.deleteProduct = async (req, res, next) => {

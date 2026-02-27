@@ -13,7 +13,6 @@ const {
 
 // Middlewares
 const upload = require("../middlewares/upload");
-// 🔥 isAdmin এর বদলে checkPermission ইম্পোর্ট
 const { verifyToken, checkPermission } = require("../middlewares/authMiddleware");
 
 // ==================================================================
@@ -21,10 +20,10 @@ const { verifyToken, checkPermission } = require("../middlewares/authMiddleware"
 // ==================================================================
 // প্রোডাক্ট দেখা সবার জন্য উন্মুক্ত
 router.get("/search", searchAndFilterProducts);
+router.get("/featured/category-products", getFeaturedCategoryProducts); 
 router.get("/", getAllProducts); 
 router.get("/related/:id", getRelatedProducts); 
-router.get("/:slug", getProductBySlug); 
-router.get("/featured/category-products", getFeaturedCategoryProducts);
+router.get("/:slug", getProductBySlug);
 
 // ==================================================================
 // PROTECTED ROUTES (Management)
@@ -33,8 +32,7 @@ router.get("/featured/category-products", getFeaturedCategoryProducts);
 // ১. লগইন চেক (সবার জন্য)
 router.use(verifyToken);
 
-// ২. ক্রিয়েট (Create) - Permission: product.create
-// ফাইল আপলোডের আগে পারমিশন চেক করা হচ্ছে (Best Practice)
+// ২. ক্রিয়েট (Create) - Permission: product.create
 router.post(
   "/create", 
   checkPermission("product.create"), 
