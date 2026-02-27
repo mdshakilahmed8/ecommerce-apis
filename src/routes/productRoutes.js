@@ -7,7 +7,8 @@ const {
   updateProduct, 
   deleteProduct,
   getRelatedProducts,
-  searchAndFilterProducts
+  searchAndFilterProducts,
+  getFeaturedCategoryProducts
 } = require("../controller/productController");
 
 // Middlewares
@@ -23,7 +24,7 @@ router.get("/search", searchAndFilterProducts);
 router.get("/", getAllProducts); 
 router.get("/related/:id", getRelatedProducts); 
 router.get("/:slug", getProductBySlug); 
-
+router.get("/featured/category-products", getFeaturedCategoryProducts);
 
 // ==================================================================
 // PROTECTED ROUTES (Management)

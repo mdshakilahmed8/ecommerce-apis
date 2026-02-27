@@ -419,3 +419,51 @@ exports.searchAndFilterProducts = async (req, res, next) => {
     next(error);
   }
 };
+
+// ==========================================
+// 7. Get Products Grouped By Featured Categories
+// ==========================================
+exports.getFeaturedCategoryProducts = async (req, res, next) => {
+  try {
+    // ১. শুধুমাত্র Featured ক্যাটাগরিগুলো আনবো (অর্ডার অনুযায়ী সাজানো)
+    const featuredCategories = await Category.find({ isFeatured: true }).sort({ order: 1 });
+
+    if (!featuredCategories.length) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const result = [];
+
+    // ২. প্রতিটি ক্যাটাগরির জন্য প্রোডাক্ট খুঁজবো
+    for (const category of featuredCategories) {
+      const products = await Product.find({ 
+        category: category._id, 
+        isPublished: true 
+      })
+        .select("title slug price discountPrice images ratingsAverage stock hasVariants")
+        .sort({ createdAt: -1 })
+        .limit(5) // 🔥 Max 5 products per category
+        .lean();
+
+      // ৩. যদি ওই ক্যাটাগরিতে অন্তত ১টি প্রোডাক্ট থাকে, তবেই লিস্টে অ্যাড করবো
+      if (products.length > 0) {
+        result.push({
+          category: { 
+            _id: category._id, 
+            name: category.name, 
+            slug: category.slug 
+          },
+          products: products
+        });
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
